@@ -115,3 +115,29 @@ def test_process_job_idempotent_skips_already_generated(
     assert processed_2.successful_count == 1
     second_mtime = Path(cert.file_path).stat().st_mtime_ns
     assert first_mtime == second_mtime
+
+
+def test_parallel_batch_processing_with_concurrency_limit(
+    db_session: Session,
+    temp_output_dir: Path,
+) -> None:
+    """Verify batch with multiple recipients processes concurrently and accurately."""
+    service = JobService(db_session)
+    service.settings.max_parallel_workers = 4
+    req = JobCreateRequest(
+        title="High Concurrency Systems",
+        organization="Parallel Labs",
+        date_of_issue="2026-10-15",
+        recipients=[
+            RecipientRequest(name=f"Concurrent Recipient {i}") for i in range(12)
+        ],
+    )
+    job = service.create_job(req)
+    processed = service.process_job(job.id)
+
+    assert processed.status == "completed"
+    assert processed.successful_count == 12
+    assert processed.failed_count == 0
+    assert len(processed.certificates) == 12
+    assert all(c.status == "success" for c in processed.certificates)
+    assert all(c.file_path is not None for c in processed.certificates)

@@ -152,22 +152,18 @@ class JobService:
             output_dir.mkdir(parents=True, exist_ok=True)
 
         total_certs = len(job.certificates)
-        for idx, cert in enumerate(job.certificates, start=1):
-            # Idempotency check: skip regeneration if certificate was already created
-            if (
-                cert.status == "success"
-                and cert.file_path
-                and self.storage.exists(cert.file_path)
-            ):
-                success_count += 1
-                continue
+        template_name = getattr(job, "template", "classic") or "classic"
+        max_workers = max(1, min(self.settings.max_parallel_workers, 20))
 
+        def _process_single_cert(
+            cert_id: str, recipient_name: str
+        ) -> tuple[str, str, str | None, str | None]:
+            """Generate and upload a single certificate in worker thread."""
             try:
-                template_name = getattr(job, "template", "classic") or "classic"
                 if is_s3:
-                    storage_key = f"{job.id}/{cert.id}.pdf"
+                    storage_key = f"{job.id}/{cert_id}.pdf"
                     pdf_bytes = generate_certificate_bytes(
-                        recipient_name=cert.recipient_name,
+                        recipient_name=recipient_name,
                         title=job.title,
                         organization=job.organization,
                         date_of_issue=job.date_of_issue,
@@ -180,9 +176,9 @@ class JobService:
                         content_type="application/pdf",
                     )
                 else:
-                    output_file = output_dir / f"{cert.id}.pdf"
+                    output_file = output_dir / f"{cert_id}.pdf"
                     generate_certificate(
-                        recipient_name=cert.recipient_name,
+                        recipient_name=recipient_name,
                         title=job.title,
                         organization=job.organization,
                         date_of_issue=job.date_of_issue,
@@ -191,46 +187,87 @@ class JobService:
                         template=template_name,
                     )
                     stored_path = str(output_file)
-
-                self.repo.update_certificate(
-                    cert,
-                    status="success",
-                    file_path=stored_path,
-                    error_message=None,
-                )
-                success_count += 1
+                return (cert_id, "success", stored_path, None)
             except Exception as exc:
-                logger.exception("Failed to generate certificate %s", cert.id)
-                self.repo.update_certificate(
-                    cert,
-                    status="failed",
-                    file_path=None,
-                    error_message=str(exc),
-                )
-                fail_count += 1
+                logger.exception("Failed to generate certificate %s", cert_id)
+                return (cert_id, "failed", None, str(exc))
 
-            self.db.commit()
+        certs_to_generate: list[Certificate] = []
+        for cert in job.certificates:
+            # Idempotency check: skip regeneration if certificate was already created
+            if (
+                cert.status == "success"
+                and cert.file_path
+                and self.storage.exists(cert.file_path)
+            ):
+                success_count += 1
+            else:
+                certs_to_generate.append(cert)
 
-            # Broadcast progress
-            pct = round((idx / total_certs) * 100) if total_certs else 100
-            publish_job_event(
-                self.settings.redis_url,
-                {
-                    "event": "job_progress",
-                    "type": "job_progress",
-                    "job_id": job.id,
-                    "title": job.title,
-                    "recipient_name": cert.recipient_name,
-                    "current_recipient": cert.recipient_name,
-                    "processed": idx,
-                    "current": idx,
-                    "total": total_certs,
-                    "total_recipients": total_certs,
-                    "percent": pct,
-                    "percentage": pct,
-                    "cert_status": cert.status,
-                },
-            )
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        processed_so_far = success_count
+        if certs_to_generate:
+            cert_map = {c.id: c for c in certs_to_generate}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_id = {
+                    executor.submit(_process_single_cert, c.id, c.recipient_name): c.id
+                    for c in certs_to_generate
+                }
+
+                for future in as_completed(future_to_id):
+                    c_id = future_to_id[future]
+                    target_cert = cert_map[c_id]
+                    processed_so_far += 1
+
+                    try:
+                        _, status, stored_path, error_msg = future.result()
+                    except Exception as err:
+                        status, stored_path, error_msg = "failed", None, str(err)
+
+                    if status == "success":
+                        success_count += 1
+                        self.repo.update_certificate(
+                            target_cert,
+                            status="success",
+                            file_path=stored_path,
+                            error_message=None,
+                        )
+                    else:
+                        fail_count += 1
+                        self.repo.update_certificate(
+                            target_cert,
+                            status="failed",
+                            file_path=None,
+                            error_message=error_msg,
+                        )
+
+                    self.db.commit()
+
+                    # Broadcast progress
+                    pct = (
+                        round((processed_so_far / total_certs) * 100)
+                        if total_certs
+                        else 100
+                    )
+                    publish_job_event(
+                        self.settings.redis_url,
+                        {
+                            "event": "job_progress",
+                            "type": "job_progress",
+                            "job_id": job.id,
+                            "title": job.title,
+                            "recipient_name": target_cert.recipient_name,
+                            "current_recipient": target_cert.recipient_name,
+                            "processed": processed_so_far,
+                            "current": processed_so_far,
+                            "total": total_certs,
+                            "total_recipients": total_certs,
+                            "percent": pct,
+                            "percentage": pct,
+                            "cert_status": target_cert.status,
+                        },
+                    )
 
         # Determine terminal status
         final_status = "completed" if fail_count == 0 else "completed_with_errors"

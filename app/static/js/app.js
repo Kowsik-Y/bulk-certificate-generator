@@ -559,19 +559,31 @@ async function loadSampleData(sampleNum) {
     if (classicRadio) classicRadio.checked = true;
     updateTemplateCardUI('classic');
 
-    const sample1 = [
-      { name: 'Alexander Wright', email: 'alexander.wright@techacademy.io' },
-      { name: 'Sophia Chen', email: 'sophia.chen@innovate.org' },
-      { name: 'Marcus Vance', email: 'marcus.vance@datasystems.com' },
-      { name: 'Elena Rostova', email: 'elena.rostova@cloudscale.net' },
-      { name: 'Liam O\'Connor', email: 'liam.oconnor@codeworks.dev' },
-      { name: 'Amina Al-Mansoor', email: 'amina.almansoor@globaledu.org' },
-      { name: 'David K. Miller', email: 'david.miller@academix.com' },
-      { name: 'Priya Sharma', email: 'priya.sharma@nextgenai.tech' },
-    ];
-    populateRecipientsFromList(sample1);
+    try {
+      const csvRes = await fetch('/static/samples/sample_recipients_1.csv');
+      if (csvRes.ok) {
+        const csvText = await csvRes.text();
+        const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+        const sampleRecipients = [];
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(',');
+          if (parts.length > 0 && parts[0].trim()) {
+            sampleRecipients.push({
+              name: parts[0].trim(),
+              email: parts.length > 1 ? parts[1].trim() : '',
+            });
+          }
+        }
+        if (sampleRecipients.length > 0) {
+          populateRecipientsFromList(sampleRecipients);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch sample CSV, using default list', e);
+    }
+
     await loadSampleSignature('/static/samples/sample_signature_1.png');
-    showToast('Loaded Sample 1 (Bootcamp & Classic Gold Template)', 'info');
+    showToast('Loaded Sample 1 (50 Recipients & Classic Gold Template)', 'info');
   } else if (sampleNum === 2) {
     document.getElementById('jobTitle').value = 'Advanced AI & Neural Systems Masterclass';
     document.getElementById('jobOrg').value = 'Quantum Intelligence Institute';

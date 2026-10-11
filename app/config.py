@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_title: str = "Bulk Certificate Generator API"
     app_version: str = "0.1.0"
     max_recipients_per_batch: int = 1000
+    max_parallel_workers: int = 5
 
     # Storage Backend Configuration (RustFS / MinIO / S3 / Local)
     storage_backend: str = "local"  # "local", "s3", "rustfs", "minio"

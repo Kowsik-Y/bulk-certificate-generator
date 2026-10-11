@@ -5,7 +5,7 @@ This folder contains ready-to-use sample CSV recipient rosters and transparent s
 ---
 
 ### Sample Set 1 (Classic Gold Template)
-- **Recipients File**: `sample_recipients_1.csv` (8 attendees)
+- **Recipients File**: `sample_recipients_1.csv` (50 attendees)
 - **Recommended Title**: Full Stack Cloud & DevOps Engineering Bootcamp
 - **Recommended Organization**: Global Tech Academy
 - **Recommended Date**: 2026-10-15

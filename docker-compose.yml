@@ -51,6 +51,7 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-certificates}
       - S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
       - S3_USE_SSL=${S3_USE_SSL:-false}
+      - MAX_PARALLEL_WORKERS=${MAX_PARALLEL_WORKERS:-5}
     volumes:
       - app_data:/data
       - ./app:/app/app
@@ -81,6 +82,7 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-certificates}
       - S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
       - S3_USE_SSL=${S3_USE_SSL:-false}
+      - MAX_PARALLEL_WORKERS=${MAX_PARALLEL_WORKERS:-5}
     volumes:
       - app_data:/data
       - ./app:/app/app

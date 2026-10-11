@@ -1,0 +1,16 @@
+{
+  "name": "bulk-certificate-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bulk Certificate Generator and File Manager with automated git hooks",
+  "scripts": {
+    "prepare": "husky",
+    "lint": "ruff check app tests && ruff format --check app tests",
+    "typecheck": "mypy app",
+    "test": "pytest --cov=app --cov-report=term-missing",
+    "check-limits": "python scripts/check_limits.py"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

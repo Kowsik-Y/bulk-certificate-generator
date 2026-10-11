@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Husky Pre-Push Hook
+# Runs the full test suite with coverage checks before pushing to GitHub.
+
+set -e
+
+echo -e "\033[94m[Husky Pre-Push]\033[0m Starting pre-push test validation before pushing to GitHub..."
+
+# Resolve Python environment
+if [ -f "./venv/bin/pytest" ]; then
+    PYTEST="./venv/bin/pytest"
+else
+    PYTEST="pytest"
+fi
+
+# Run test suite with code coverage
+echo -e "\033[94m[Test Suite]\033[0m Executing pytest with code coverage (minimum 90% required)..."
+$PYTEST --cov=app --cov-report=term-missing --cov-fail-under=90 -q
+
+echo -e "\033[92m[Husky Pre-Push]\033[0m All tests and coverage requirements passed! Push allowed.\n"

@@ -31,6 +31,8 @@ data/
 # IDE and OS
 .idea/
 .vscode/
+node_modules/
+package-lock.json
 *.swp
 *.swo
 .DS_Store

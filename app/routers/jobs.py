@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -18,6 +18,7 @@ from app.schemas import (
     SystemStatsResponse,
 )
 from app.services.job_service import JobService
+from app.storage.local import LocalStorageBackend
 from app.tasks import process_job_task
 
 router = APIRouter(tags=["Certificates & Jobs"])
@@ -116,7 +117,7 @@ def get_certificates(
 def download_certificate(
     certificate_id: str,
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """Download the generated PDF for an individual recipient."""
     service = JobService(db)
     cert = service.get_certificate_by_id(certificate_id)
@@ -135,20 +136,23 @@ def download_certificate(
             detail=f"Certificate not available: {error_detail}",
         )
 
-    settings = get_settings()
-    file_path = Path(cert.file_path).resolve()
-    base_storage = Path(settings.output_dir).resolve()
+    storage = service.storage
 
-    # Path traversal security protection
-    try:
-        file_path.relative_to(base_storage)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: file path is outside authorized storage directory",
-        ) from None
+    if isinstance(storage, LocalStorageBackend):
+        settings = get_settings()
+        file_path = Path(cert.file_path).resolve()
+        base_storage = Path(settings.output_dir).resolve()
+        try:
+            file_path.relative_to(base_storage)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Access denied: file path is outside authorized storage directory"
+                ),
+            ) from None
 
-    if not file_path.is_file():
+    if not storage.exists(cert.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Certificate PDF file is missing from storage",
@@ -157,10 +161,17 @@ def download_certificate(
     safe_name = sanitize_filename(cert.recipient_name)
     download_filename = f"certificate_{safe_name}.pdf"
 
-    return FileResponse(
-        path=str(file_path),
+    if isinstance(storage, LocalStorageBackend):
+        return FileResponse(
+            path=str(cert.file_path),
+            media_type="application/pdf",
+            filename=download_filename,
+        )
+
+    return StreamingResponse(
+        storage.stream(cert.file_path),
         media_type="application/pdf",
-        filename=download_filename,
+        headers={"Content-Disposition": f'attachment; filename="{download_filename}"'},
     )
 
 
@@ -256,7 +267,7 @@ def list_certificates(
 def preview_certificate(
     certificate_id: str,
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """View certificate PDF inline in browser for preview modals."""
     service = JobService(db)
     cert = service.get_certificate_by_id(certificate_id)
@@ -275,26 +286,37 @@ def preview_certificate(
             detail=f"Certificate not available: {error_detail}",
         )
 
-    settings = get_settings()
-    file_path = Path(cert.file_path).resolve()
-    base_storage = Path(settings.output_dir).resolve()
+    storage = service.storage
 
-    try:
-        file_path.relative_to(base_storage)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: file path is outside authorized storage directory",
-        ) from None
+    if isinstance(storage, LocalStorageBackend):
+        settings = get_settings()
+        file_path = Path(cert.file_path).resolve()
+        base_storage = Path(settings.output_dir).resolve()
+        try:
+            file_path.relative_to(base_storage)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Access denied: file path is outside authorized storage directory"
+                ),
+            ) from None
 
-    if not file_path.is_file():
+    if not storage.exists(cert.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Certificate PDF file is missing from storage",
         )
 
-    return FileResponse(
-        path=str(file_path),
+    if isinstance(storage, LocalStorageBackend):
+        return FileResponse(
+            path=str(cert.file_path),
+            media_type="application/pdf",
+            headers={"Content-Disposition": "inline"},
+        )
+
+    return StreamingResponse(
+        storage.stream(cert.file_path),
         media_type="application/pdf",
         headers={"Content-Disposition": "inline"},
     )

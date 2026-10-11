@@ -21,6 +21,9 @@ const elements = {
   statTotalJobs: document.getElementById('statTotalJobs'),
   statSuccessRate: document.getElementById('statSuccessRate'),
   statStorageUsed: document.getElementById('statStorageUsed'),
+  statStorageBucket: document.getElementById('statStorageBucket'),
+  storageBackendText: document.getElementById('storageBackendText'),
+  btnRustFSConsole: document.getElementById('btnRustFSConsole'),
   
   jobFilterSelect: document.getElementById('jobFilterSelect'),
   searchInput: document.getElementById('searchInput'),
@@ -82,6 +85,19 @@ async function fetchStats() {
       : 100;
     elements.statSuccessRate.textContent = `${rate}%`;
     elements.statStorageUsed.textContent = data.total_storage_formatted;
+
+    if (elements.storageBackendText) {
+      const isRustFS = ['s3', 'rustfs', 'minio'].includes((data.storage_backend || '').toLowerCase());
+      if (isRustFS) {
+        elements.storageBackendText.textContent = `Storage: RustFS (S3)`;
+        if (elements.btnRustFSConsole) elements.btnRustFSConsole.style.display = 'inline-flex';
+        if (elements.statStorageBucket) elements.statStorageBucket.textContent = `Bucket: ${data.bucket_name || 'certificates'}`;
+      } else {
+        elements.storageBackendText.textContent = `Storage: Local Disk`;
+        if (elements.btnRustFSConsole) elements.btnRustFSConsole.style.display = 'none';
+        if (elements.statStorageBucket) elements.statStorageBucket.textContent = 'Local Volume';
+      }
+    }
   } catch (err) {
     console.error('Error fetching stats:', err);
   }
@@ -189,13 +205,13 @@ function renderTableView() {
   const rows = state.certificates.map(cert => {
     const statusBadge = getStatusBadge(cert.status);
     const size = cert.file_size_formatted || (cert.status === 'success' ? 'Ready' : '—');
-    const date = new Date(cert.created_at).toLocaleDateString();
+    const isS3 = ['s3', 'rustfs', 'minio'].includes((cert.storage_backend || '').toLowerCase());
 
     return `
       <tr>
         <td>
           <div class="file-info">
-            <div class="file-icon">PDF</div>
+            <div class="file-icon" style="${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
             <div>
               <div class="file-name">${escapeHtml(cert.recipient_name)}</div>
               <div class="file-sub">${escapeHtml(cert.recipient_email || 'No email')}</div>
@@ -207,7 +223,9 @@ function renderTableView() {
           <div class="file-sub">${escapeHtml(cert.job_organization)}</div>
         </td>
         <td>${statusBadge}</td>
-        <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted)">${size}</td>
+        <td style="font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:var(--text-muted)">
+          ${size} ${isS3 ? '<span style="color:#FB923C; font-size:0.7rem; font-weight:600;">[RustFS]</span>' : ''}
+        </td>
         <td style="font-size:0.8rem; color:var(--text-muted)">${date}</td>
         <td>
           <div style="display:flex; gap:6px; justify-content:flex-end">
@@ -215,7 +233,7 @@ function renderTableView() {
               <button class="btn btn-secondary btn-icon" title="Preview PDF" onclick="openPreview('${cert.id}', '${escapeAttr(cert.recipient_name)}')">
                 👁️
               </button>
-              <a href="${cert.download_url}" class="btn btn-secondary btn-icon" title="Download PDF" download>
+              <a href="${cert.presigned_url || cert.download_url}" class="btn btn-secondary btn-icon" title="Download PDF" download>
                 ⬇️
               </a>
             ` : ''}
@@ -252,11 +270,12 @@ function renderGridView() {
     const statusBadge = getStatusBadge(cert.status);
     const size = cert.file_size_formatted || '—';
     const date = new Date(cert.created_at).toLocaleDateString();
+    const isS3 = ['s3', 'rustfs', 'minio'].includes((cert.storage_backend || '').toLowerCase());
 
     return `
       <div class="cert-card">
         <div class="cert-card-header">
-          <div class="file-icon" style="width:42px; height:42px; font-size:14px">PDF</div>
+          <div class="file-icon" style="width:42px; height:42px; font-size:14px; ${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
           ${statusBadge}
         </div>
         <div>
@@ -264,7 +283,7 @@ function renderGridView() {
           <div class="cert-card-course">${escapeHtml(cert.job_title)}</div>
         </div>
         <div class="cert-card-meta">
-          <span>${size}</span>
+          <span>${size} ${isS3 ? '<b style="color:#FB923C;">RustFS</b>' : ''}</span>
           <span>${date}</span>
         </div>
         <div class="cert-card-actions">
@@ -272,7 +291,7 @@ function renderGridView() {
             <button class="btn btn-secondary" style="flex:1; padding:8px" onclick="openPreview('${cert.id}', '${escapeAttr(cert.recipient_name)}')">
               Preview
             </button>
-            <a href="${cert.download_url}" class="btn btn-primary" style="flex:1; padding:8px; text-align:center" download>
+            <a href="${cert.presigned_url || cert.download_url}" class="btn btn-primary" style="flex:1; padding:8px; text-align:center" download>
               Download
             </a>
           ` : ''}

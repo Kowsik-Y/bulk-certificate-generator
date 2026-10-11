@@ -21,6 +21,13 @@
         </div>
       </a>
       <div class="nav-actions">
+        <div class="storage-badge" id="storageBadge" title="Active File Storage Backend">
+          <span class="badge-dot"></span>
+          <span id="storageBackendText">Storage: Local Disk</span>
+        </div>
+        <a href="http://localhost:9001" target="_blank" class="btn btn-rustfs" id="btnRustFSConsole" title="Open RustFS Web Management Console" style="display: none;">
+          🦀 RustFS Console
+        </a>
         <a href="/docs" target="_blank" class="btn btn-secondary" id="btnApiDocs" title="Open Swagger OpenAPI Documentation">
           📖 API Docs
         </a>
@@ -58,6 +65,7 @@
         <div class="stat-content">
           <div class="stat-label">Storage Used</div>
           <div class="stat-value" id="statStorageUsed">0.0 KB</div>
+          <div class="stat-sublabel" id="statStorageBucket">Local Volume</div>
         </div>
       </div>
     </section>

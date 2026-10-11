@@ -153,6 +153,8 @@ class CertificateFileItemResponse(BaseModel):
     created_at: datetime
     download_url: str
     preview_url: str
+    presigned_url: str | None = None
+    storage_backend: str = "local"
 
 
 class CertificateListResponse(BaseModel):
@@ -173,3 +175,5 @@ class SystemStatsResponse(BaseModel):
     failed_certificates: int
     total_storage_bytes: int
     total_storage_formatted: str
+    storage_backend: str = "local"
+    bucket_name: str | None = None

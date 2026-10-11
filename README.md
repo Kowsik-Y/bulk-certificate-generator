@@ -8,11 +8,12 @@ A high-performance, asynchronous backend API built with **FastAPI**, **Celery**,
 
 - **Asynchronous Job Processing**: Submit bulk certificate requests and receive immediate acknowledgement (`202 Accepted`). Certificate generation executes in background workers powered by Celery and Redis.
 - **Per-Certificate Error Isolation**: A rendering error or malformed data in an individual certificate does **not** fail the batch. Successful certificates are persisted and made downloadable, while failures are captured with descriptive error messages.
+- **Pluggable Storage Backends (RustFS / MinIO / Local)**: Store generated PDF certificates in S3-compatible high-performance object storage like **RustFS** or **MinIO** with automatic bucket creation, presigned URLs, and streaming downloads, or on local volumes.
 - **Vector PDF Generation**: Uses ReportLab canvas drawing to generate crisp, print-ready landscape certificates (ivory background, double gold borders, corner ornaments, official seals, and custom typography) with zero external image dependencies.
 - **Strict Data Validation**: Validates all payload structures at the API boundary using Pydantic v2 (name formatting, non-blank checks, regex for emails and ISO dates).
 - **Fault-Tolerant & Durable**: Celery tasks feature `acks_late=True`, exponential backoff retry policies, and `worker_prefetch_multiplier=1` for fair queue balancing.
-- **Layered Architecture**: Clean separation between Routers, Service Layer, Repository Layer, and PDF Generator.
-- **100% Test Coverage**: Comprehensive test suite covering API contracts, validation edge cases, ReportLab PDF rendering, service layer logic, and failure resilience.
+- **Layered Architecture**: Clean separation between Routers, Service Layer, Storage Layer, Repository Layer, and PDF Generator.
+- **100% Test Coverage**: Comprehensive test suite covering API contracts, validation edge cases, ReportLab PDF rendering, service layer logic, S3/RustFS storage, and failure resilience.
 
 ---
 
@@ -20,10 +21,9 @@ A high-performance, asynchronous backend API built with **FastAPI**, **Celery**,
 
 ```mermaid
 graph TD
-    Client[Client / Frontend] -->|POST /api/jobs/| Router[FastAPI Router]
-    Client -->|GET /api/jobs/{id}/| Router
-    Client -->|GET /api/jobs/{id}/certificates/| Router
+    Client[Client / Frontend Dashboard] -->|POST /api/jobs/| Router[FastAPI Router]
     Client -->|GET /api/certificates/{id}/download/| Router
+    Client -->|GET /api/jobs/{id}/download-zip/| Router
 
     Router --> Service[JobService]
     Service --> Repo[JobRepository]
@@ -32,7 +32,9 @@ graph TD
     Service -->|Dispatch Task| Redis[(Redis Broker)]
     Redis --> Worker[Celery Worker]
     Worker --> Generator[ReportLab Generator]
-    Generator --> Filesystem[(PDF Output Storage)]
+    Worker --> Storage[Storage Backend]
+    Storage -->|S3 API| RustFS[(RustFS / MinIO S3 Bucket)]
+    Storage -->|Local| Filesystem[(Local Volume Storage)]
     Worker --> Repo
 ```
 
@@ -42,8 +44,9 @@ graph TD
 2. **Persistence**: Job record and individual recipient certificate records are created in `pending` status.
 3. **Dispatch**: A Celery task is enqueued to Redis and returns immediately with `job_id`.
 4. **Worker Execution**: Celery worker picks up the job, switches status to `processing`, and generates each certificate in an isolated `try/except` boundary.
-5. **Terminal State**: When all recipients are processed, job status transitions to `completed` (or `completed_with_errors` if partial failures occurred).
-6. **Download**: Generated PDFs can be individually downloaded via `GET /api/certificates/{id}/download/`.
+5. **Storage**: In S3 mode, generated PDF bytes stream directly into the configured RustFS / MinIO bucket (`s3://certificates/{job_id}/{cert_id}.pdf`). In local mode, they are saved to the output volume.
+6. **Terminal State**: When all recipients are processed, job status transitions to `completed` (or `completed_with_errors` if partial failures occurred).
+7. **Download & Management**: Generated PDFs can be downloaded, previewed inline, or exported as a ZIP archive through the API or the built-in web File Manager.
 
 ---
 
@@ -52,6 +55,7 @@ graph TD
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | **Web Framework** | FastAPI | High-performance asynchronous API, auto OpenAPI documentation, dependency injection |
+| **Object Storage** | RustFS / MinIO / S3 | High-performance, S3-compatible distributed storage with web management console |
 | **Data Validation** | Pydantic v2 | Strict schema enforcement, custom validators, fast Rust core |
 | **Task Queue** | Celery + Redis | Durable background processing, tasks survive restarts, retry policies, monitoring |
 | **Database** | SQLAlchemy 2.0 (SQLite / PostgreSQL) | Clean ORM with repository pattern, zero-config SQLite default |
@@ -292,7 +296,7 @@ An interactive dashboard is served directly at:
 - 📦 **One-Click Batch ZIP Download**: Export entire batches with clean file naming.
 - 🗑️ **Safe File Deletion**: Delete individual certificates with physical storage cleanup.
 - 🚀 **Built-in Batch Dispatcher**: Launch new certificate generation batches directly from a modern modal dialog.
-- 🌓 **Rich Dark Aesthetics**: Glassmorphism UI built with Vanilla CSS and Vanilla JS (zero frontend build step needed).
+- **Rich Dark Aesthetics**: Glassmorphism UI built with Vanilla CSS and Vanilla JS (zero frontend build step needed).
 
 ---
 
@@ -314,13 +318,40 @@ ruff format --check app tests
 
 ---
 
+## Configuration & Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///./certificates.db` | SQLAlchemy database connection string (SQLite / PostgreSQL) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis broker and backend URL for Celery |
+| `STORAGE_BACKEND` | `local` | Storage mode: `local` (volume) or `rustfs` / `s3` / `minio` |
+| `S3_ENDPOINT_URL` | `None` (`http://rustfs:9000` in Docker) | S3-compatible service URL (RustFS, MinIO, or LocalStack) |
+| `S3_ACCESS_KEY_ID` | `rustfsadmin` | S3 Access Key ID |
+| `S3_SECRET_ACCESS_KEY` | `rustfsadmin` | S3 Secret Access Key |
+| `S3_BUCKET_NAME` | `certificates` | Target bucket for certificate objects (auto-created if missing) |
+| `OUTPUT_DIR` | `./output` | Host storage directory for local mode and temporary ZIP staging |
+| `MAX_RECIPIENTS_PER_BATCH` | `1000` | Maximum recipients allowed in a single request |
+
+---
+
+## 🦀 RustFS S3 Web Management Console
+
+When running with Docker Compose:
+- **RustFS S3 API**: `http://localhost:9000`
+- **RustFS Web Management Console**: `http://localhost:9001`
+- **Default Credentials**: `rustfsadmin` / `rustfsadmin`
+
+You can log into the console at `http://localhost:9001` to view your `certificates` bucket, inspect object trees, track storage usage, or download files directly from the browser!
+
+---
+
 ## Project Structure
 
 ```
 Bulk Certificate Generator/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py                  # Pydantic Settings
+│   ├── config.py                  # Pydantic Settings & Storage configuration
 │   ├── database.py                # SQLAlchemy Engine, Session, Base
 │   ├── models.py                  # Job & Certificate ORM models
 │   ├── schemas.py                 # Pydantic request/response models
@@ -328,7 +359,12 @@ Bulk Certificate Generator/
 │   ├── tasks.py                   # Celery background tasks with retry
 │   ├── generator/
 │   │   ├── __init__.py
-│   │   └── certificate_generator.py # ReportLab PDF canvas drawing
+│   │   └── certificate_generator.py # ReportLab PDF canvas drawing & in-memory bytes
+│   ├── storage/
+│   │   ├── __init__.py            # Storage factory & singleton getters
+│   │   ├── base.py                # StorageBackend abstract interface & errors
+│   │   ├── local.py               # Local filesystem storage backend
+│   │   └── s3.py                  # S3 storage backend (RustFS / MinIO / AWS S3)
 │   ├── repositories/
 │   │   ├── __init__.py
 │   │   └── job_repository.py      # Database CRUD operations
@@ -338,6 +374,10 @@ Bulk Certificate Generator/
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   └── jobs.py                # FastAPI HTTP routes
+│   ├── static/                    # Certificate File Manager web assets
+│   │   ├── css/styles.css         # Glassmorphism dark-mode stylesheet
+│   │   ├── js/app.js              # Vanilla JS frontend application
+│   │   └── index.html             # Certificate File Manager dashboard
 │   └── main.py                    # FastAPI application & lifespan
 ├── output/                        # Default storage directory for PDFs
 ├── tests/
@@ -346,15 +386,16 @@ Bulk Certificate Generator/
 │   ├── test_validation.py         # Pydantic payload validation tests
 │   ├── test_generator.py          # ReportLab PDF unit tests
 │   ├── test_service.py            # JobService business logic tests
+│   ├── test_storage.py            # Storage backend tests (Local and S3/RustFS)
 │   ├── test_tasks.py              # Celery task retry tests
 │   └── test_failure_handling.py   # Partial failure resilience tests
-├── docker-compose.yml             # Full stack container configuration (Redis, API, Worker)
+├── docker-compose.yml             # Full stack container configuration (Redis, RustFS, API, Worker)
 ├── Dockerfile                     # Multi-stage container build image
 ├── init.sh                        # POSIX Bash initialization & runner script
 ├── init.ps1                       # Windows PowerShell initialization & runner script
 ├── docker-run.sh                  # One-command Docker stack launcher (Linux/macOS)
 ├── docker-run.ps1                 # One-command Docker stack launcher (Windows)
-├── pyproject.toml                 # Tool configuration (Ruff, Pytest, Coverage)
+├── pyproject.toml                 # Tool configuration (Ruff, Pytest, Coverage, Mypy)
 ├── requirements.txt               # Dependencies
 └── README.md
 ```

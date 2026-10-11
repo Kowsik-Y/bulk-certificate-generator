@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     max_recipients_per_batch: int = 1000
 
+    # Storage Backend Configuration (RustFS / MinIO / S3 / Local)
+    storage_backend: str = "local"  # "local", "s3", "rustfs", "minio"
+    s3_endpoint_url: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    s3_bucket_name: str = "certificates"
+    s3_region_name: str = "us-east-1"
+    s3_use_ssl: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

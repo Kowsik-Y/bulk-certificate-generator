@@ -70,9 +70,23 @@ def temp_output_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             database_url=TEST_DATABASE_URL,
         )
 
+    from app.storage.local import LocalStorageBackend
+
     monkeypatch.setattr("app.config.get_settings", mock_get_settings)
     monkeypatch.setattr("app.services.job_service.get_settings", mock_get_settings)
     monkeypatch.setattr("app.routers.jobs.get_settings", mock_get_settings)
+    monkeypatch.setattr(
+        "app.storage.get_storage_backend",
+        lambda: LocalStorageBackend(mock_get_settings()),
+    )
+    monkeypatch.setattr(
+        "app.services.job_service.create_storage_backend",
+        lambda s=None: LocalStorageBackend(mock_get_settings()),
+    )
+    monkeypatch.setattr(
+        "app.storage.create_storage_backend",
+        lambda s=None: LocalStorageBackend(mock_get_settings()),
+    )
     return out_dir
 
 

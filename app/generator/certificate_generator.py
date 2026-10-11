@@ -4,6 +4,7 @@ Generates professional landscape certificates using canvas drawing primitives.
 Self-contained with vector graphics, decorative borders, and elegant typography.
 """
 
+import io
 from pathlib import Path
 
 from reportlab.lib.colors import HexColor
@@ -29,53 +30,16 @@ def draw_corner_ornament(
     c.restoreState()
 
 
-def generate_certificate(
+def _render_certificate_content(
+    c: canvas.Canvas,
     recipient_name: str,
     title: str,
     organization: str,
     date_of_issue: str,
-    output_path: str,
-) -> str:
-    """Generate a single professional PDF certificate.
-
-    Args:
-        recipient_name: Name of the recipient to appear on the certificate.
-        title: Title of the course or event.
-        organization: Name of the issuing organization.
-        date_of_issue: Date string (YYYY-MM-DD format).
-        output_path: Full file path where the generated PDF should be saved.
-
-    Returns:
-        The output_path of the generated certificate.
-
-    Raises:
-        ValueError: If any required parameter is missing or empty.
-        OSError: If the destination directory or file cannot be written.
-    """
-    if not recipient_name or not recipient_name.strip():
-        raise ValueError("Recipient name cannot be empty")
-    if not title or not title.strip():
-        raise ValueError("Title cannot be empty")
-    if not organization or not organization.strip():
-        raise ValueError("Organization cannot be empty")
-    if not date_of_issue or not date_of_issue.strip():
-        raise ValueError("Date of issue cannot be empty")
-
-    recipient_name = recipient_name.strip()
-    title = title.strip()
-    organization = organization.strip()
-    date_of_issue = date_of_issue.strip()
-
-    # Ensure target directory exists
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    # 11 x 8.5 inches landscape (792 x 612 pt)
-    page_size = landscape(letter)
-    width, height = page_size
-
-    c = canvas.Canvas(str(destination), pagesize=page_size)
-
+    width: float,
+    height: float,
+) -> None:
+    """Draw all graphical and typographic certificate elements onto canvas."""
     # --- Background Canvas ---
     c.setFillColor(HexColor("#FDFAF4"))  # Warm parchment/ivory tone
     c.rect(0, 0, width, height, fill=1, stroke=0)
@@ -206,8 +170,88 @@ def generate_certificate(
     c.setFillColor(HexColor("#555555"))
     c.drawCentredString(width * 0.72, footer_y - 2, "Authorized Signature")
 
-    # Complete document
+
+def generate_certificate_bytes(
+    recipient_name: str,
+    title: str,
+    organization: str,
+    date_of_issue: str,
+) -> bytes:
+    """Generate a single professional PDF certificate directly as bytes in memory.
+
+    Args:
+        recipient_name: Name of the recipient to appear on the certificate.
+        title: Title of the course or event.
+        organization: Name of the issuing organization.
+        date_of_issue: Date string (YYYY-MM-DD format).
+
+    Returns:
+        Raw PDF document binary bytes.
+
+    Raises:
+        ValueError: If any required parameter is missing or empty.
+    """
+    if not recipient_name or not recipient_name.strip():
+        raise ValueError("Recipient name cannot be empty")
+    if not title or not title.strip():
+        raise ValueError("Title cannot be empty")
+    if not organization or not organization.strip():
+        raise ValueError("Organization cannot be empty")
+    if not date_of_issue or not date_of_issue.strip():
+        raise ValueError("Date of issue cannot be empty")
+
+    clean_name = recipient_name.strip()
+    clean_title = title.strip()
+    clean_org = organization.strip()
+    clean_date = date_of_issue.strip()
+
+    buf = io.BytesIO()
+    page_size = landscape(letter)
+    width, height = page_size
+
+    c = canvas.Canvas(buf, pagesize=page_size)
+    _render_certificate_content(
+        c=c,
+        recipient_name=clean_name,
+        title=clean_title,
+        organization=clean_org,
+        date_of_issue=clean_date,
+        width=width,
+        height=height,
+    )
     c.showPage()
     c.save()
 
+    return buf.getvalue()
+
+
+def generate_certificate(
+    recipient_name: str,
+    title: str,
+    organization: str,
+    date_of_issue: str,
+    output_path: str,
+) -> str:
+    """Generate a single professional PDF certificate and save it to disk.
+
+    Args:
+        recipient_name: Name of the recipient to appear on the certificate.
+        title: Title of the course or event.
+        organization: Name of the issuing organization.
+        date_of_issue: Date string (YYYY-MM-DD format).
+        output_path: Full file path where the generated PDF should be saved.
+
+    Returns:
+        The output_path of the generated certificate.
+    """
+    destination = Path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    pdf_bytes = generate_certificate_bytes(
+        recipient_name=recipient_name,
+        title=title,
+        organization=organization,
+        date_of_issue=date_of_issue,
+    )
+    destination.write_bytes(pdf_bytes)
     return str(destination)

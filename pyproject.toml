@@ -39,6 +39,8 @@ warn_unused_configs = true
 module = [
     "reportlab.*",
     "celery.*",
+    "boto3",
+    "botocore.*",
 ]
 ignore_missing_imports = true
 

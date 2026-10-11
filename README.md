@@ -21,20 +21,20 @@ A high-performance, asynchronous backend API built with **FastAPI**, **Celery**,
 
 ```mermaid
 graph TD
-    Client[Client / Frontend Dashboard] -->|POST /api/jobs/| Router[FastAPI Router]
-    Client -->|GET /api/certificates/{id}/download/| Router
-    Client -->|GET /api/jobs/{id}/download-zip/| Router
+    Client[Client / Frontend Dashboard] -->|"POST /api/jobs/"| Router[FastAPI Router]
+    Client -->|"GET /api/certificates/{id}/download/"| Router
+    Client -->|"GET /api/jobs/{id}/download-zip/"| Router
 
     Router --> Service[JobService]
     Service --> Repo[JobRepository]
     Repo --> DB[(SQLite / PostgreSQL)]
 
-    Service -->|Dispatch Task| Redis[(Redis Broker)]
+    Service -->|"Dispatch Task"| Redis[(Redis Broker)]
     Redis --> Worker[Celery Worker]
     Worker --> Generator[ReportLab Generator]
     Worker --> Storage[Storage Backend]
-    Storage -->|S3 API| RustFS[(RustFS / MinIO S3 Bucket)]
-    Storage -->|Local| Filesystem[(Local Volume Storage)]
+    Storage -->|"S3 API"| RustFS[(RustFS / MinIO S3 Bucket)]
+    Storage -->|"Local"| Filesystem[(Local Volume Storage)]
     Worker --> Repo
 ```
 

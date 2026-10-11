@@ -68,11 +68,11 @@ run_local() {
     pip install -r requirements.txt --quiet
     log_success "Dependencies installed."
 
-    # Start Redis
-    log_info "Checking Redis status..."
+    # Start Redis & RustFS infrastructure
+    log_info "Checking infrastructure services (Redis & RustFS)..."
     if command -v docker &> /dev/null; then
-        log_info "Starting Redis via docker compose..."
-        docker compose up -d redis
+        log_info "Starting Redis and RustFS via docker compose..."
+        docker compose up -d redis rustfs
     else
         log_warn "Docker not detected. Ensure local Redis is running on localhost:6379."
     fi
@@ -96,6 +96,7 @@ run_local() {
 
     log_info "Starting FastAPI application server on http://localhost:8000..."
     log_info "API Docs: http://localhost:8000/docs"
+    log_info "Certificate File Manager: http://localhost:8000/"
     uvicorn app.main:app --reload --port 8000
 }
 
@@ -117,6 +118,15 @@ run_tests() {
 
     log_info "Running pytest test suite with code coverage..."
     pytest --cov=app --cov-report=term-missing -v
+
+    log_info "Running Ruff linter and format validation..."
+    ruff check app tests
+    ruff format --check app tests
+
+    log_info "Running Mypy static type checker..."
+    mypy app
+
+    log_success "All tests, lint checks, and type validations passed successfully!"
 }
 
 # ------------------------------------------------------------------------------

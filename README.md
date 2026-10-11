@@ -73,7 +73,7 @@ graph TD
 
 ### Option A: Run via Docker (Recommended — Single Command)
 
-Builds the application image and starts Redis, FastAPI, and Celery Worker containers simultaneously:
+Builds the application image and starts Redis, RustFS S3 Object Storage, FastAPI, and Celery Worker containers simultaneously:
 
 **Linux / macOS:**
 ```bash
@@ -305,15 +305,15 @@ An interactive dashboard is served directly at:
 Tests run in-memory with Celery in **eager mode** (`task_always_eager=True`), meaning no running Redis or Celery worker process is needed to execute the test suite!
 
 ```bash
-# Run pytest
-pytest -v
-
-# Run with test coverage
+# Run pytest with test coverage
 pytest --cov=app --cov-report=term-missing
 
 # Lint & Format checks
 ruff check app tests
 ruff format --check app tests
+
+# Static type safety inspection
+mypy app
 ```
 
 ---
@@ -334,7 +334,7 @@ ruff format --check app tests
 
 ---
 
-## 🦀 RustFS S3 Web Management Console
+## RustFS S3 Web Management Console
 
 When running with Docker Compose:
 - **RustFS S3 API**: `http://localhost:9000`
@@ -389,6 +389,7 @@ Bulk Certificate Generator/
 │   ├── test_storage.py            # Storage backend tests (Local and S3/RustFS)
 │   ├── test_tasks.py              # Celery task retry tests
 │   └── test_failure_handling.py   # Partial failure resilience tests
+├── .dockerignore                  # Docker build context exclusions
 ├── docker-compose.yml             # Full stack container configuration (Redis, RustFS, API, Worker)
 ├── Dockerfile                     # Multi-stage container build image
 ├── init.sh                        # POSIX Bash initialization & runner script
@@ -399,4 +400,6 @@ Bulk Certificate Generator/
 ├── requirements.txt               # Dependencies
 └── README.md
 ```
+
+
 

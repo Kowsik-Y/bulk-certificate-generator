@@ -90,10 +90,10 @@ function Start-LocalStack {
         New-Item -ItemType Directory -Path "output" | Out-Null
     }
 
-    # Start Redis via docker if available
+    # Start Redis and RustFS infrastructure via docker if available
     if (Get-Command "docker" -ErrorAction SilentlyContinue) {
-        Write-Step "Starting Redis container..."
-        docker compose up -d redis
+        Write-Step "Starting Redis and RustFS containers..."
+        docker compose up -d redis rustfs
     } else {
         Write-Warn "Docker not found. Ensure a local Redis server is listening on localhost:6379."
     }
@@ -103,12 +103,15 @@ function Start-LocalStack {
 
     Write-Step "Starting FastAPI server on http://localhost:8000..."
     Write-Success "Interactive Swagger Docs: http://localhost:8000/docs"
+    Write-Success "Certificate File Manager: http://localhost:8000/"
     & $venvUvicorn "app.main:app" --reload --port 8000
 }
 
 function Run-Tests {
     $venvPath = Join-Path $PSScriptRoot "venv"
     $venvPytest = Join-Path $venvPath "Scripts\pytest.exe"
+    $venvRuff = Join-Path $venvPath "Scripts\ruff.exe"
+    $venvMypy = Join-Path $venvPath "Scripts\mypy.exe"
 
     if (-not (Test-Path $venvPytest)) {
         Write-Step "Setting up test environment..."
@@ -119,6 +122,19 @@ function Run-Tests {
 
     Write-Step "Running test suite with code coverage..."
     & $venvPytest --cov=app --cov-report=term-missing -v
+
+    if (Test-Path $venvRuff) {
+        Write-Step "Running Ruff linter..."
+        & $venvRuff check app tests
+        & $venvRuff format --check app tests
+    }
+
+    if (Test-Path $venvMypy) {
+        Write-Step "Running Mypy static type checker..."
+        & $venvMypy app
+    }
+
+    Write-Success "All tests and code quality validations completed!"
 }
 
 # Interactive Menu if no mode passed

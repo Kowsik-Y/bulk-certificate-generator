@@ -1,0 +1,44 @@
+[project]
+name = "bulk-certificate-generator"
+version = "0.1.0"
+description = "Bulk Certificate Generator API with Celery, Redis, FastAPI, and ReportLab"
+authors = [{ name = "Kowsik" }]
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "tests/*",
+    "app/celery_app.py",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008"]  # Allow FastAPI Depends() in endpoint signatures
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+disallow_any_generics = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "reportlab.*",
+    "celery.*",
+]
+ignore_missing_imports = true
+

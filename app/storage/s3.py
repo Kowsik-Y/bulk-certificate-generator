@@ -6,7 +6,7 @@ from typing import Any
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.config import Settings, get_settings
 from app.storage.base import (
@@ -80,6 +80,8 @@ class S3StorageBackend(StorageBackend):
                 logger.warning("head_bucket failed with code %s: %s", error_code, exc)
                 # Still mark as verified to avoid hammering on temporary network issues
                 self._bucket_verified = True
+        except BotoCoreError as b_err:
+            logger.warning("head_bucket connection error: %s", b_err)
 
     def upload(
         self, key: str, data: bytes, content_type: str = "application/pdf"
@@ -183,7 +185,7 @@ class S3StorageBackend(StorageBackend):
                             "path": f"s3://{self.bucket_name}/{item['Key']}",
                         }
                     )
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.warning("S3 list_objects error: %s", e)
         return results
 
@@ -196,7 +198,7 @@ class S3StorageBackend(StorageBackend):
                 for item in page.get("Contents", []):
                     total_bytes += item.get("Size", 0)
                     count += 1
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.warning("S3 get_stats error: %s", e)
         return {"total_bytes": total_bytes, "object_count": count}
 
@@ -212,6 +214,6 @@ class S3StorageBackend(StorageBackend):
             if "://rustfs:9000" in url:
                 url = url.replace("://rustfs:9000", "://localhost:9000")
             return url
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.warning("S3 generate_presigned_url error: %s", e)
             return None

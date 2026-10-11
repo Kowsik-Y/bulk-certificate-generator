@@ -87,6 +87,14 @@ const elements = {
   templateCardClassic: document.getElementById('templateCardClassic'),
   templateCardModern: document.getElementById('templateCardModern'),
   
+  // Alert / Confirm Dialog Modal
+  alertDialogModal: document.getElementById('alertDialogModal'),
+  alertDialogIcon: document.getElementById('alertDialogIcon'),
+  alertDialogTitle: document.getElementById('alertDialogTitle'),
+  alertDialogMessage: document.getElementById('alertDialogMessage'),
+  btnAlertCancel: document.getElementById('btnAlertCancel'),
+  btnAlertConfirm: document.getElementById('btnAlertConfirm'),
+
   toastContainer: document.getElementById('toastContainer'),
 };
 
@@ -106,6 +114,135 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 250);
   }, 3500);
 }
+
+// --- Custom Alert & Confirm Dialogs ---
+let alertDialogResolve = null;
+
+function getAlertIconSvg(type) {
+  if (type === 'danger') {
+    return `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    `;
+  }
+  if (type === 'warning') {
+    return `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    `;
+  }
+  if (type === 'success') {
+    return `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    `;
+  }
+  return `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="16" x2="12" y2="12"/>
+      <line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>
+  `;
+}
+
+function showConfirmDialog({
+  title = 'Confirm Action',
+  message = 'Are you sure you want to proceed?',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  type = 'danger',
+} = {}) {
+  return new Promise((resolve) => {
+    alertDialogResolve = resolve;
+
+    if (elements.alertDialogTitle) elements.alertDialogTitle.textContent = title;
+    if (elements.alertDialogMessage) elements.alertDialogMessage.textContent = message;
+
+    if (elements.alertDialogIcon) {
+      elements.alertDialogIcon.className = `alert-dialog-icon-wrapper ${type}`;
+      elements.alertDialogIcon.innerHTML = getAlertIconSvg(type);
+    }
+
+    if (elements.btnAlertConfirm) {
+      elements.btnAlertConfirm.textContent = confirmText;
+      elements.btnAlertConfirm.className = type === 'danger'
+        ? 'btn btn-danger'
+        : type === 'warning'
+        ? 'btn btn-warning'
+        : 'btn btn-primary';
+    }
+
+    if (elements.btnAlertCancel) {
+      elements.btnAlertCancel.textContent = cancelText;
+      elements.btnAlertCancel.style.display = 'inline-flex';
+    }
+
+    if (elements.alertDialogModal) {
+      elements.alertDialogModal.classList.add('active');
+    }
+    if (elements.btnAlertConfirm) {
+      elements.btnAlertConfirm.focus();
+    }
+  });
+}
+
+function showAlertDialog({
+  title = 'Notification',
+  message = '',
+  confirmText = 'OK',
+  type = 'info',
+} = {}) {
+  return new Promise((resolve) => {
+    alertDialogResolve = resolve;
+
+    if (elements.alertDialogTitle) elements.alertDialogTitle.textContent = title;
+    if (elements.alertDialogMessage) elements.alertDialogMessage.textContent = message;
+
+    if (elements.alertDialogIcon) {
+      elements.alertDialogIcon.className = `alert-dialog-icon-wrapper ${type}`;
+      elements.alertDialogIcon.innerHTML = getAlertIconSvg(type);
+    }
+
+    if (elements.btnAlertConfirm) {
+      elements.btnAlertConfirm.textContent = confirmText;
+      elements.btnAlertConfirm.className = 'btn btn-primary';
+    }
+
+    if (elements.btnAlertCancel) {
+      elements.btnAlertCancel.style.display = 'none';
+    }
+
+    if (elements.alertDialogModal) {
+      elements.alertDialogModal.classList.add('active');
+    }
+    if (elements.btnAlertConfirm) {
+      elements.btnAlertConfirm.focus();
+    }
+  });
+}
+
+function closeAlertDialog(result = false) {
+  if (elements.alertDialogModal) {
+    elements.alertDialogModal.classList.remove('active');
+  }
+  if (alertDialogResolve) {
+    const cb = alertDialogResolve;
+    alertDialogResolve = null;
+    cb(result);
+  }
+}
+
+window.showAlert = showAlertDialog;
+window.showConfirm = showConfirmDialog;
 
 // --- Fetch Metrics & Stats ---
 async function fetchStats() {
@@ -340,7 +477,14 @@ async function deleteSelectedCertificates() {
   }
 
   const confirmMsg = `Are you sure you want to permanently delete the ${ids.length} selected certificate(s)? All generated files will be removed.`;
-  if (!window.confirm(confirmMsg)) {
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Selected Certificates',
+    message: confirmMsg,
+    confirmText: `Delete ${ids.length} Certificate${ids.length > 1 ? 's' : ''}`,
+    cancelText: 'Cancel',
+    type: 'danger',
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -555,7 +699,14 @@ function closePreview() {
 
 // --- Delete Certificate ---
 async function deleteCertificate(id) {
-  if (!confirm('Are you sure you want to delete this certificate and remove its file?')) {
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Certificate',
+    message: 'Are you sure you want to permanently delete this certificate and remove its PDF file from storage?',
+    confirmText: 'Delete Certificate',
+    cancelText: 'Cancel',
+    type: 'danger',
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -630,7 +781,14 @@ async function deleteCurrentBatch() {
   const batchTitle = currentJob ? currentJob.title : state.selectedJobId;
   const certCount = currentJob ? currentJob.total_recipients : 0;
   const confirmMsg = `Are you sure you want to delete batch "${batchTitle}" (${certCount} certificates)? All generated PDF files will be permanently deleted.`;
-  if (!window.confirm(confirmMsg)) {
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Batch',
+    message: confirmMsg,
+    confirmText: 'Delete Batch',
+    cancelText: 'Cancel',
+    type: 'danger',
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -655,7 +813,14 @@ async function deleteCurrentBatch() {
 }
 
 async function deleteEmptyBatches() {
-  if (!window.confirm('Are you sure you want to delete all empty batches (batches with 0 certificates)?')) {
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Empty Batches',
+    message: 'Are you sure you want to delete all empty batches (batches with 0 certificates)?',
+    confirmText: 'Delete Empty Batches',
+    cancelText: 'Cancel',
+    type: 'warning',
+  });
+  if (!confirmed) {
     return;
   }
 
@@ -1185,6 +1350,26 @@ function setupEventListeners() {
   if (elements.btnDeleteSelected) {
     elements.btnDeleteSelected.addEventListener('click', deleteSelectedCertificates);
   }
+
+  // Alert Dialog buttons & dismissal
+  if (elements.btnAlertConfirm) {
+    elements.btnAlertConfirm.addEventListener('click', () => closeAlertDialog(true));
+  }
+  if (elements.btnAlertCancel) {
+    elements.btnAlertCancel.addEventListener('click', () => closeAlertDialog(false));
+  }
+  if (elements.alertDialogModal) {
+    elements.alertDialogModal.addEventListener('click', (e) => {
+      if (e.target === elements.alertDialogModal) {
+        closeAlertDialog(false);
+      }
+    });
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && elements.alertDialogModal && elements.alertDialogModal.classList.contains('active')) {
+      closeAlertDialog(false);
+    }
+  });
 
   // Delegation for table/grid selection checkboxes
   elements.filesContainer.addEventListener('change', (e) => {

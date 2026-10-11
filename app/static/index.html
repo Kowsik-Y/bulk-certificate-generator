@@ -332,11 +332,30 @@
     </div>
   </div>
 
+  <!-- Custom Alert / Confirm Dialog Modal -->
+  <div class="modal-overlay" id="alertDialogModal" role="alertdialog" aria-modal="true" aria-labelledby="alertDialogTitle" aria-describedby="alertDialogMessage">
+    <div class="modal-box alert-dialog-box">
+      <div class="alert-dialog-content">
+        <div class="alert-dialog-icon-wrapper" id="alertDialogIcon">
+          <!-- Dynamically inserted SVG icon -->
+        </div>
+        <div class="alert-dialog-text">
+          <h3 id="alertDialogTitle" class="alert-dialog-title">Confirm Action</h3>
+          <p id="alertDialogMessage" class="alert-dialog-message">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+      <div class="modal-footer alert-dialog-footer">
+        <button type="button" class="btn btn-secondary" id="btnAlertCancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btnAlertConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <!-- Frontend Logic -->
-  <script src="/static/js/app.js?v=1.9"></script>
+  <script src="/static/js/app.js?v=2.0"></script>
 </body>
 
 </html>

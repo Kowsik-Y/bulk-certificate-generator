@@ -33,6 +33,9 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   filesContainer: document.getElementById('filesContainer'),
   btnDownloadZip: document.getElementById('btnDownloadZip'),
+  btnDeleteBatch: document.getElementById('btnDeleteBatch'),
+  btnDeleteEmptyBatches: document.getElementById('btnDeleteEmptyBatches'),
+  batchInfoBar: document.getElementById('batchInfoBar'),
   btnDownloadSelectedZip: document.getElementById('btnDownloadSelectedZip'),
   btnDownloadSelectedText: document.getElementById('btnDownloadSelectedText'),
   btnRefresh: document.getElementById('btnRefresh'),
@@ -61,6 +64,7 @@ const elements = {
   btnCloseJobModal: document.getElementById('btnCloseJobModal'),
   btnCancelJobModal: document.getElementById('btnCancelJobModal'),
   recipientsContainer: document.getElementById('recipientsContainer'),
+  recipientCountBadge: document.getElementById('recipientCountBadge'),
   btnAddRecipient: document.getElementById('btnAddRecipient'),
   btnUploadRecipientsFile: document.getElementById('btnUploadRecipientsFile'),
   recipientFileInput: document.getElementById('recipientFileInput'),
@@ -147,10 +151,12 @@ async function fetchJobs() {
     state.jobs.forEach(job => {
       const opt = document.createElement('option');
       opt.value = job.id;
-      opt.textContent = `${job.title} (${job.total_recipients} certs) - ${job.status}`;
+      const isEmpty = (job.total_recipients === 0 || (!job.successful_count && job.status !== 'processing' && job.status !== 'pending'));
+      opt.textContent = `${job.title} (${job.total_recipients} certs) - ${job.status}${isEmpty ? ' [Empty]' : ''}`;
       elements.jobFilterSelect.appendChild(opt);
     });
     elements.jobFilterSelect.value = currentVal;
+
     
     // Check if any job is still pending/processing
     const activeJob = state.jobs.find(j => j.status === 'pending' || j.status === 'processing');
@@ -212,12 +218,9 @@ async function fetchCertificates(showSpinner = true) {
     const currentIds = new Set(data.items.map(c => c.id));
     state.selectedCertIds = new Set(Array.from(state.selectedCertIds).filter(id => currentIds.has(id)));
 
-    // Enable/disable ZIP button
-    if (state.selectedJobId) {
-      elements.btnDownloadZip.style.display = 'inline-flex';
-    } else {
-      elements.btnDownloadZip.style.display = 'none';
-    }
+    // Update batch selection toolbar actions and info bar
+    updateSelectedJobUI();
+
 
     renderCertificates();
   } catch (err) {
@@ -512,6 +515,116 @@ function downloadCurrentJobZip() {
   window.location.href = `/api/jobs/${state.selectedJobId}/download-zip/`;
 }
 
+// --- Batch Selection and Deletion ---
+function updateSelectedJobUI() {
+  const selectedJob = state.jobs.find(j => j.id === state.selectedJobId);
+  if (state.selectedJobId && selectedJob) {
+    if (elements.btnDownloadZip) elements.btnDownloadZip.style.display = 'inline-flex';
+    if (elements.btnDeleteBatch) elements.btnDeleteBatch.style.display = 'inline-flex';
+    if (elements.batchInfoBar) {
+      elements.batchInfoBar.style.display = 'flex';
+      const tplName = selectedJob.template === 'modern' ? 'Modern Slate & Sky' : 'Classic Gold Parchment';
+      const tplBadge = selectedJob.template === 'modern' ? '<span class="template-badge modern">[Modern]</span>' : '<span class="template-badge classic">[Classic]</span>';
+      elements.batchInfoBar.innerHTML = `
+        <div>
+          <div class="batch-info-title">${escapeHtml(selectedJob.title)}</div>
+          <div class="batch-info-meta">
+            <span>Org: <strong>${escapeHtml(selectedJob.organization)}</strong></span>
+            <span>Date: <strong>${escapeHtml(selectedJob.date_of_issue)}</strong></span>
+            <span>Template: ${tplBadge} <strong>${tplName}</strong></span>
+            <span>Status: <span class="status-badge ${selectedJob.status}">[${selectedJob.status.toUpperCase()}]</span></span>
+            <span>Total: <strong>${selectedJob.total_recipients}</strong></span>
+            <span>Ready: <strong style="color:var(--emerald-success);">${selectedJob.successful_count || 0}</strong></span>
+            <span>Failed: <strong style="color:var(--rose-danger);">${selectedJob.failed_count || 0}</strong></span>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" id="btnBannerDownloadZip" style="font-size:0.75rem; padding:5px 12px;">Download Batch ZIP</button>
+          <button class="btn btn-danger" id="btnBannerDeleteBatch" style="font-size:0.75rem; padding:5px 12px;">Delete Batch</button>
+        </div>
+      `;
+      const btnBannerDownloadZip = document.getElementById('btnBannerDownloadZip');
+      if (btnBannerDownloadZip) {
+        btnBannerDownloadZip.addEventListener('click', downloadCurrentJobZip);
+      }
+      const btnBannerDeleteBatch = document.getElementById('btnBannerDeleteBatch');
+      if (btnBannerDeleteBatch) {
+        btnBannerDeleteBatch.addEventListener('click', deleteCurrentBatch);
+      }
+    }
+  } else {
+    if (elements.btnDownloadZip) elements.btnDownloadZip.style.display = 'none';
+    if (elements.btnDeleteBatch) elements.btnDeleteBatch.style.display = 'none';
+    if (elements.batchInfoBar) elements.batchInfoBar.style.display = 'none';
+  }
+}
+
+async function deleteCurrentBatch() {
+  if (!state.selectedJobId) {
+    showToast('Please select a batch to delete from the dropdown filter first', 'info');
+    return;
+  }
+  const currentJob = state.jobs.find(j => j.id === state.selectedJobId);
+  const batchTitle = currentJob ? currentJob.title : state.selectedJobId;
+  const certCount = currentJob ? currentJob.total_recipients : 0;
+  const confirmMsg = `Are you sure you want to delete batch "${batchTitle}" (${certCount} certificates)? All generated PDF files will be permanently deleted.`;
+  if (!window.confirm(confirmMsg)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/jobs/${encodeURIComponent(state.selectedJobId)}/`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete batch');
+    }
+    showToast(`Batch "${batchTitle}" deleted successfully`, 'success');
+    state.selectedJobId = '';
+    if (elements.jobFilterSelect) elements.jobFilterSelect.value = '';
+    updateSelectedJobUI();
+    await fetchJobs();
+    await fetchStats();
+    await fetchCertificates();
+  } catch (err) {
+    showToast(`Error deleting batch: ${err.message}`, 'error');
+  }
+}
+
+async function deleteEmptyBatches() {
+  if (!window.confirm('Are you sure you want to delete all empty batches (batches with 0 certificates)?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/jobs/cleanup/empty/', {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete empty batches');
+    }
+    const data = await res.json();
+    if (data.deleted_count === 0) {
+      showToast('No empty batches found to delete', 'info');
+    } else {
+      showToast(`Successfully deleted ${data.deleted_count} empty batch(es)`, 'success');
+    }
+    if (state.selectedJobId && data.deleted_job_ids && data.deleted_job_ids.includes(state.selectedJobId)) {
+      state.selectedJobId = '';
+      if (elements.jobFilterSelect) elements.jobFilterSelect.value = '';
+      updateSelectedJobUI();
+    }
+    await fetchJobs();
+    await fetchStats();
+    await fetchCertificates();
+  } catch (err) {
+    showToast(`Error cleaning empty batches: ${err.message}`, 'error');
+  }
+}
+
+
 function updateTemplateCardUI(val) {
   if (elements.templateCardClassic) {
     elements.templateCardClassic.classList.toggle('active', val === 'classic');
@@ -657,14 +770,16 @@ function handleSignatureFileSelect(file) {
   reader.readAsDataURL(file);
 }
 
+function updateRecipientCountBadge() {
+  if (!elements.recipientCountBadge) return;
+  const count = elements.recipientsContainer.querySelectorAll('.recipient-entry').length;
+  elements.recipientCountBadge.textContent = `${count} recipient${count === 1 ? '' : 's'}`;
+}
+
 function resetRecipients() {
   clearSignature();
-  elements.recipientsContainer.innerHTML = `
-    <div class="recipient-entry">
-      <input type="text" class="form-input recipient-name" placeholder="Recipient Full Name" required>
-      <input type="email" class="form-input recipient-email" placeholder="Email (optional)">
-    </div>
-  `;
+  elements.recipientsContainer.innerHTML = '';
+  addRecipientRow();
   if (elements.fileUploadStatus) {
     elements.fileUploadStatus.textContent = '';
     elements.fileUploadStatus.style.display = 'none';
@@ -672,6 +787,7 @@ function resetRecipients() {
   if (elements.recipientFileInput) {
     elements.recipientFileInput.value = '';
   }
+  updateRecipientCountBadge();
 }
 
 function addRecipientRow(name = '', email = '') {
@@ -680,10 +796,19 @@ function addRecipientRow(name = '', email = '') {
   row.innerHTML = `
     <input type="text" class="form-input recipient-name" value="${escapeAttr(name)}" placeholder="Recipient Full Name" required>
     <input type="email" class="form-input recipient-email" value="${escapeAttr(email)}" placeholder="Email (optional)">
-    <button type="button" class="btn btn-danger btn-icon" title="Remove Recipient" onclick="this.parentElement.remove()">&times;</button>
+    <button type="button" class="btn btn-danger btn-icon btn-remove-recipient" title="Remove Recipient">&times;</button>
   `;
+  const btnRemove = row.querySelector('.btn-remove-recipient');
+  if (btnRemove) {
+    btnRemove.addEventListener('click', () => {
+      row.remove();
+      updateRecipientCountBadge();
+    });
+  }
   elements.recipientsContainer.appendChild(row);
+  updateRecipientCountBadge();
 }
+
 
 // --- Import Recipients from JSON, CSV, or Excel File ---
 async function handleRecipientFileUpload(file) {
@@ -960,6 +1085,7 @@ function setupEventListeners() {
   // Job Filter
   elements.jobFilterSelect.addEventListener('change', (e) => {
     state.selectedJobId = e.target.value;
+    updateSelectedJobUI();
     fetchCertificates();
   });
 
@@ -982,10 +1108,19 @@ function setupEventListeners() {
   });
 
   // Buttons & Modals
-  elements.btnDownloadZip.addEventListener('click', downloadCurrentJobZip);
+  if (elements.btnDownloadZip) {
+    elements.btnDownloadZip.addEventListener('click', downloadCurrentJobZip);
+  }
+  if (elements.btnDeleteBatch) {
+    elements.btnDeleteBatch.addEventListener('click', deleteCurrentBatch);
+  }
+  if (elements.btnDeleteEmptyBatches) {
+    elements.btnDeleteEmptyBatches.addEventListener('click', deleteEmptyBatches);
+  }
   if (elements.btnDownloadSelectedZip) {
     elements.btnDownloadSelectedZip.addEventListener('click', downloadSelectedZip);
   }
+
 
   // Delegation for table/grid selection checkboxes
   elements.filesContainer.addEventListener('change', (e) => {

@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -401,6 +402,51 @@ class JobService:
         self.repo.delete_certificate(cert)
         self.db.commit()
         return True
+
+    def delete_job(self, job_id: str) -> bool:
+        """Delete a job, remove all its stored PDF files, and delete DB records."""
+        job = self.repo.get_job_by_id(job_id)
+        if not job:
+            return False
+
+        # Delete all stored certificate files
+        for cert in job.certificates:
+            if cert.file_path:
+                self.storage.delete(cert.file_path)
+
+        # Delete any cached zip files for this job
+        import tempfile
+
+        zip_path = (
+            Path(tempfile.gettempdir()) / "cert_zips" / f"certificates_job_{job.id}.zip"
+        )
+        if zip_path.is_file():
+            try:
+                zip_path.unlink()
+            except OSError:
+                pass
+
+        self.repo.delete_job(job)
+        self.db.commit()
+        return True
+
+    def delete_empty_jobs(self) -> dict[str, Any]:
+        """Delete all jobs that contain zero certificates or zero recipients."""
+        empty_jobs = self.repo.get_empty_jobs()
+        deleted_ids: list[str] = []
+        for job in empty_jobs:
+            for cert in job.certificates:
+                if cert.file_path:
+                    self.storage.delete(cert.file_path)
+            self.repo.delete_job(job)
+            deleted_ids.append(job.id)
+        self.db.commit()
+        return {
+            "status": "success",
+            "message": f"Successfully deleted {len(deleted_ids)} empty batches",
+            "deleted_count": len(deleted_ids),
+            "deleted_job_ids": deleted_ids,
+        }
 
     def create_job_zip(self, job_id: str) -> Path:
         """Create a zip archive containing all generated certificates for a job."""

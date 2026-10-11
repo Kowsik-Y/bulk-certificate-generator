@@ -753,3 +753,84 @@ def test_create_job_with_modern_template(client: TestClient, db_session) -> None
     items = list_resp.json()["items"]
     assert len(items) == 2
     assert all(item["template"] == "modern" for item in items)
+
+
+def test_delete_job_success_and_not_found(client: TestClient, db_session) -> None:
+    """Verify deleting a job cleans up certificates and returns proper status."""
+    from app.services.job_service import JobService
+
+    payload = {
+        "title": "Batch To Delete",
+        "organization": "Test Academy",
+        "date_of_issue": "2026-10-20",
+        "recipients": [
+            {"name": "Delete Me 1", "email": "del1@example.com"},
+            {"name": "Delete Me 2", "email": "del2@example.com"},
+        ],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    service = JobService(db=db_session)
+    service.process_job(job_id)
+
+    # Ensure certificates exist
+    certs_resp = client.get(f"/api/jobs/{job_id}/certificates/")
+    assert certs_resp.status_code == 200
+    assert len(certs_resp.json()) == 2
+
+    # Delete the job
+    del_resp = client.delete(f"/api/jobs/{job_id}/")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["status"] == "success"
+    assert del_resp.json()["job_id"] == job_id
+
+    # Verify job is now 404
+    get_resp = client.get(f"/api/jobs/{job_id}/")
+    assert get_resp.status_code == 404
+
+    # Deleting non-existent job returns 404
+    del_again = client.delete(f"/api/jobs/{job_id}/")
+    assert del_again.status_code == 404
+
+
+def test_delete_empty_jobs(client: TestClient, db_session) -> None:
+    """Verify cleanup of empty jobs leaving non-empty ones intact."""
+    from app.models import Job
+
+    # Create an empty job (0 recipients, 0 certificates)
+    empty_job = Job(
+        title="Empty Abandoned Batch",
+        organization="Ghost Org",
+        date_of_issue="2026-10-20",
+        total_recipients=0,
+        status="completed",
+        successful_count=0,
+        failed_count=0,
+    )
+    db_session.add(empty_job)
+    db_session.commit()
+    empty_job_id = empty_job.id
+
+    # Create a non-empty job
+    payload = {
+        "title": "Keep This Batch",
+        "organization": "Real Org",
+        "date_of_issue": "2026-10-20",
+        "recipients": [{"name": "Keep User", "email": "keep@example.com"}],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    keep_job_id = resp.json()["job_id"]
+
+    # Trigger delete empty jobs
+    cleanup_resp = client.delete("/api/jobs/cleanup/empty/")
+    assert cleanup_resp.status_code == 200
+    data = cleanup_resp.json()
+    assert data["status"] == "success"
+    assert empty_job_id in data["deleted_job_ids"]
+
+    # Ensure empty job is gone
+    assert client.get(f"/api/jobs/{empty_job_id}/").status_code == 404
+    # Ensure non-empty job remains
+    assert client.get(f"/api/jobs/{keep_job_id}/").status_code == 200

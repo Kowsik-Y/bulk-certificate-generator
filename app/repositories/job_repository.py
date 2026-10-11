@@ -148,6 +148,19 @@ class JobRepository:
         self.db.delete(cert)
         self.db.flush()
 
+    def delete_job(self, job: Job) -> None:
+        """Remove a job record and all associated certificates."""
+        self.db.delete(job)
+        self.db.flush()
+
+    def get_empty_jobs(self) -> list[Job]:
+        """Retrieve jobs that have zero certificates or zero total recipients."""
+        stmt = select(Job).options(selectinload(Job.certificates))
+        all_jobs = list(self.db.scalars(stmt).all())
+        return [
+            j for j in all_jobs if len(j.certificates) == 0 or j.total_recipients == 0
+        ]
+
     def get_system_stats(self) -> dict[str, int]:
         """Compute aggregated statistics for jobs and certificates."""
         from sqlalchemy import func

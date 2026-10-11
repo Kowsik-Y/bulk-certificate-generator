@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 output_dir = Path("sample_data")

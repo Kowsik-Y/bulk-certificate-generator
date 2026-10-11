@@ -424,6 +424,47 @@ def list_jobs(
     return [JobStatusResponse.model_validate(j) for j in jobs]
 
 
+@router.delete(
+    "/api/jobs/cleanup/empty/",
+    status_code=status.HTTP_200_OK,
+    summary="Delete all empty jobs",
+    description="Deletes all jobs that have zero certificates or zero recipients.",
+)
+def delete_empty_jobs(
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Delete all empty jobs with zero certificates."""
+    service = JobService(db)
+    return service.delete_empty_jobs()
+
+
+@router.delete(
+    "/api/jobs/{job_id}/",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a batch job and all its certificates",
+    description=(
+        "Deletes the job and cleans up all generated certificate files from storage."
+    ),
+)
+def delete_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Delete a batch job and all associated certificates."""
+    service = JobService(db)
+    deleted = service.delete_job(job_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job '{job_id}' not found",
+        )
+    return {
+        "status": "success",
+        "message": f"Job '{job_id}' and all its certificates deleted successfully",
+        "job_id": job_id,
+    }
+
+
 @router.get(
     "/api/jobs/{job_id}/download-zip/",
     summary="Download all certificates for a job as a ZIP archive",

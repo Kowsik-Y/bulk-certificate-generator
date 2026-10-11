@@ -19,6 +19,7 @@ from app.schemas import (
     SystemStatsResponse,
 )
 from app.storage import StorageBackend, create_storage_backend
+from app.websockets import publish_job_event
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class JobService:
             organization=request.organization,
             date_of_issue=request.date_of_issue,
             total_recipients=len(request.recipients),
+            signature_data=request.signature_data,
         )
 
         for recipient in request.recipients:
@@ -67,6 +69,16 @@ class JobService:
 
         self.db.commit()
         self.db.refresh(job)
+
+        publish_job_event(
+            self.settings.redis_url,
+            {
+                "type": "job_created",
+                "job_id": job.id,
+                "title": job.title,
+                "total_recipients": job.total_recipients,
+            },
+        )
         return job
 
     def update_job_task_id(self, job_id: str, task_id: str) -> None:
@@ -100,6 +112,29 @@ class JobService:
         self.repo.update_job(job, status="processing")
         self.db.commit()
 
+        publish_job_event(
+            self.settings.redis_url,
+            {
+                "type": "job_started",
+                "job_id": job.id,
+                "title": job.title,
+                "total_recipients": job.total_recipients,
+            },
+        )
+
+        # Decode signature image if provided
+        signature_bytes: bytes | None = None
+        if job.signature_data:
+            try:
+                import base64
+
+                raw_b64 = job.signature_data
+                if "," in raw_b64:
+                    raw_b64 = raw_b64.split(",", 1)[1]
+                signature_bytes = base64.b64decode(raw_b64)
+            except Exception as e:
+                logger.warning("Failed to decode signature image base64: %s", e)
+
         success_count = 0
         fail_count = 0
 
@@ -109,7 +144,8 @@ class JobService:
         if not is_s3:
             output_dir.mkdir(parents=True, exist_ok=True)
 
-        for cert in job.certificates:
+        total_certs = len(job.certificates)
+        for idx, cert in enumerate(job.certificates, start=1):
             # Idempotency check: skip regeneration if certificate was already created
             if (
                 cert.status == "success"
@@ -127,6 +163,7 @@ class JobService:
                         title=job.title,
                         organization=job.organization,
                         date_of_issue=job.date_of_issue,
+                        signature_image_bytes=signature_bytes,
                     )
                     stored_path = self.storage.upload(
                         key=storage_key,
@@ -141,6 +178,7 @@ class JobService:
                         organization=job.organization,
                         date_of_issue=job.date_of_issue,
                         output_path=str(output_file),
+                        signature_image_bytes=signature_bytes,
                     )
                     stored_path = str(output_file)
 
@@ -163,6 +201,23 @@ class JobService:
 
             self.db.commit()
 
+            # Broadcast progress
+            publish_job_event(
+                self.settings.redis_url,
+                {
+                    "type": "job_progress",
+                    "job_id": job.id,
+                    "title": job.title,
+                    "recipient_name": cert.recipient_name,
+                    "current": idx,
+                    "total": total_certs,
+                    "percentage": (
+                        round((idx / total_certs) * 100) if total_certs else 100
+                    ),
+                    "cert_status": cert.status,
+                },
+            )
+
         # Determine terminal status
         final_status = "completed" if fail_count == 0 else "completed_with_errors"
 
@@ -175,6 +230,18 @@ class JobService:
         )
         self.db.commit()
         self.db.refresh(job)
+
+        publish_job_event(
+            self.settings.redis_url,
+            {
+                "type": "job_completed",
+                "job_id": job.id,
+                "title": job.title,
+                "status": final_status,
+                "successful_count": success_count,
+                "failed_count": fail_count,
+            },
+        )
         return job
 
     def get_job_status(self, job_id: str) -> Job | None:

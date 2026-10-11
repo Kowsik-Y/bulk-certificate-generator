@@ -38,6 +38,7 @@ def _render_certificate_content(
     date_of_issue: str,
     width: float,
     height: float,
+    signature_image_bytes: bytes | None = None,
 ) -> None:
     """Draw all graphical and typographic certificate elements onto canvas."""
     # --- Background Canvas ---
@@ -163,9 +164,32 @@ def _render_certificate_content(
     c.setStrokeColor(HexColor("#888888"))
     c.setLineWidth(0.8)
     c.line(width * 0.72 - 70, footer_y + 12, width * 0.72 + 70, footer_y + 12)
-    c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(HexColor("#1A1A2E"))
-    c.drawCentredString(width * 0.72, footer_y + 24, organization)
+
+    if signature_image_bytes:
+        try:
+            from reportlab.lib.utils import ImageReader
+
+            img = ImageReader(io.BytesIO(signature_image_bytes))
+            sig_w = 110
+            sig_h = 36
+            c.drawImage(
+                img,
+                width * 0.72 - (sig_w / 2),
+                footer_y + 14,
+                width=sig_w,
+                height=sig_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+        except Exception:
+            c.setFont("Helvetica-Bold", 10)
+            c.setFillColor(HexColor("#1A1A2E"))
+            c.drawCentredString(width * 0.72, footer_y + 24, organization)
+    else:
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(HexColor("#1A1A2E"))
+        c.drawCentredString(width * 0.72, footer_y + 24, organization)
+
     c.setFont("Helvetica", 9)
     c.setFillColor(HexColor("#555555"))
     c.drawCentredString(width * 0.72, footer_y - 2, "Authorized Signature")
@@ -176,6 +200,7 @@ def generate_certificate_bytes(
     title: str,
     organization: str,
     date_of_issue: str,
+    signature_image_bytes: bytes | None = None,
 ) -> bytes:
     """Generate a single professional PDF certificate directly as bytes in memory.
 
@@ -218,6 +243,7 @@ def generate_certificate_bytes(
         date_of_issue=clean_date,
         width=width,
         height=height,
+        signature_image_bytes=signature_image_bytes,
     )
     c.showPage()
     c.save()
@@ -231,19 +257,9 @@ def generate_certificate(
     organization: str,
     date_of_issue: str,
     output_path: str,
+    signature_image_bytes: bytes | None = None,
 ) -> str:
-    """Generate a single professional PDF certificate and save it to disk.
-
-    Args:
-        recipient_name: Name of the recipient to appear on the certificate.
-        title: Title of the course or event.
-        organization: Name of the issuing organization.
-        date_of_issue: Date string (YYYY-MM-DD format).
-        output_path: Full file path where the generated PDF should be saved.
-
-    Returns:
-        The output_path of the generated certificate.
-    """
+    """Generate a single professional PDF certificate and save it to disk."""
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -252,6 +268,7 @@ def generate_certificate(
         title=title,
         organization=organization,
         date_of_issue=date_of_issue,
+        signature_image_bytes=signature_image_bytes,
     )
     destination.write_bytes(pdf_bytes)
     return str(destination)

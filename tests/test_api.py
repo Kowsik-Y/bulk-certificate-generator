@@ -567,3 +567,66 @@ def test_parse_recipients_invalid_or_empty_file(client: TestClient) -> None:
         files={"file": ("bad.json", b"{invalid json", "application/json")},
     )
     assert resp_bad_json.status_code == 400
+
+
+def test_create_job_with_signature_and_process(
+    client: TestClient, db_session, monkeypatch
+) -> None:
+    """Verify job creation with signature image and generation pipeline."""
+    from unittest.mock import MagicMock
+
+    from app.services.job_service import JobService
+
+    mock_delay = MagicMock()
+    mock_delay.return_value.id = "mock-celery-task-id"
+    monkeypatch.setattr("app.tasks.process_job_task.delay", mock_delay)
+
+    tiny_png_b64 = (
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA"
+        "AAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    )
+
+    resp = client.post(
+        "/api/jobs/",
+        json={
+            "title": "Signature Masterclass",
+            "organization": "Auth Dept",
+            "date_of_issue": "2026-10-15",
+            "signature_data": tiny_png_b64,
+            "recipients": [{"name": "Signed Recipient", "email": "sig@example.com"}],
+        },
+    )
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    # Process job directly and verify signature image rendered without error
+    service = JobService(db=db_session)
+    job = service.process_job(job_id)
+    assert job.status == "completed"
+    assert job.successful_count == 1
+    assert job.signature_data == tiny_png_b64
+
+
+def test_websocket_endpoint_connect_and_broadcast(client: TestClient) -> None:
+    """Verify WebSocket endpoint connection and manager broadcasting."""
+    import asyncio
+
+    from app.websockets import manager as ws_manager
+
+    with client.websocket_connect("/ws/jobs") as ws:
+        # Broadcast an event through ws_manager
+        asyncio.run(
+            ws_manager.broadcast(
+                {
+                    "event": "job_progress",
+                    "job_id": "test-ws-id",
+                    "processed": 5,
+                    "total": 10,
+                    "percent": 50,
+                }
+            )
+        )
+        msg = ws.receive_json()
+        assert msg["event"] == "job_progress"
+        assert msg["job_id"] == "test-ws-id"
+        assert msg["percent"] == 50

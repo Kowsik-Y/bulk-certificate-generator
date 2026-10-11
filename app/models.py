@@ -37,6 +37,7 @@ class Job(Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     organization: Mapped[str] = mapped_column(String(300), nullable=False)
     date_of_issue: Mapped[str] = mapped_column(String(10), nullable=False)
+    signature_data: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Celery task tracking
     celery_task_id: Mapped[str | None] = mapped_column(String, nullable=True)

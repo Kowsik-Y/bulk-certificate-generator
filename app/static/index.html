@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bulk Certificate Manager — High Performance Dashboard</title>
   <meta name="description" content="Manage, preview, search, and download generated PDF certificates in bulk with Celery and FastAPI.">
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/styles.css?v=1.2">
 </head>
 <body>
   <div class="app-container">
@@ -93,6 +93,27 @@
           <div class="stat-value" id="statStorageUsed">0.0 KB</div>
           <div class="stat-sublabel" id="statStorageBucket">Local Volume</div>
         </div>
+      </div>
+    </section>
+
+    <!-- Live Job Progress Banner (WebSockets real-time tracking) -->
+    <section class="live-job-banner" id="liveJobBanner" style="display:none;" aria-live="polite">
+      <div class="live-banner-header">
+        <div class="live-banner-title-wrap">
+          <span class="live-pulse"></span>
+          <span class="live-banner-label">LIVE BATCH GENERATION</span>
+          <span class="live-banner-job" id="liveJobTitle">—</span>
+        </div>
+        <div class="live-banner-stats">
+          <span id="liveJobProgressText" style="font-family:'JetBrains Mono',monospace; font-size:0.875rem;">0 / 0</span>
+          <span class="live-badge" id="liveJobPercent">0%</span>
+        </div>
+      </div>
+      <div class="live-progress-bar-bg">
+        <div class="live-progress-bar" id="liveProgressBar" style="width: 0%;"></div>
+      </div>
+      <div class="live-banner-footer" id="liveJobFooter">
+        Processing recipient: <span id="liveJobRecipient" class="text-white">—</span>
       </div>
     </section>
 
@@ -192,6 +213,24 @@
             </div>
           </div>
 
+          <!-- Authorized Signature Upload -->
+          <div class="form-group" style="margin-top:16px;">
+            <label>Authorized Signatory Image (Optional - PNG/JPG)</label>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:6px; flex-wrap:wrap;">
+              <input type="file" id="signatureFileInput" accept="image/png,image/jpeg,image/jpg" style="display:none">
+              <button type="button" class="btn btn-secondary" id="btnUploadSignature" style="padding:6px 12px; font-size:0.8rem;">
+                Upload Signature Image
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnClearSignature" style="padding:6px 10px; font-size:0.8rem; display:none; color:var(--rose-danger); border-color:rgba(244,63,94,0.3);">
+                Remove Signature
+              </button>
+              <div id="signaturePreviewBox" class="signature-preview-box" style="display:none;">
+                <img id="signaturePreviewImg" src="" alt="Signature Preview">
+              </div>
+            </div>
+            <div class="text-xs text-muted" style="margin-top:4px;">When uploaded, this signature will appear directly above the authorized signatory line on all generated certificates.</div>
+          </div>
+
           <div class="form-group" style="margin-top:20px;">
             <div class="recipients-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <label style="margin-bottom:0">Recipients List *</label>
@@ -224,6 +263,6 @@
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <!-- Frontend Logic -->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=1.2"></script>
 </body>
 </html>

@@ -13,6 +13,9 @@ const state = {
   selectedJobId: '',
   searchQuery: '',
   pollTimer: null,
+  currentSignatureData: null,
+  socket: null,
+  reconnectAttempts: 0,
 };
 
 // --- DOM References ---
@@ -33,6 +36,14 @@ const elements = {
   btnNewBatch: document.getElementById('btnNewBatch'),
   btnViewTable: document.getElementById('btnViewTable'),
   btnViewGrid: document.getElementById('btnViewGrid'),
+
+  // Live Job Banner
+  liveJobBanner: document.getElementById('liveJobBanner'),
+  liveJobTitle: document.getElementById('liveJobTitle'),
+  liveJobProgressText: document.getElementById('liveJobProgressText'),
+  liveJobPercent: document.getElementById('liveJobPercent'),
+  liveProgressBar: document.getElementById('liveProgressBar'),
+  liveJobRecipient: document.getElementById('liveJobRecipient'),
   
   // Preview Modal
   previewModal: document.getElementById('previewModal'),
@@ -52,6 +63,13 @@ const elements = {
   recipientFileInput: document.getElementById('recipientFileInput'),
   fileUploadStatus: document.getElementById('fileUploadStatus'),
   btnSubmitJob: document.getElementById('btnSubmitJob'),
+
+  // Signature Upload
+  btnUploadSignature: document.getElementById('btnUploadSignature'),
+  btnClearSignature: document.getElementById('btnClearSignature'),
+  signatureFileInput: document.getElementById('signatureFileInput'),
+  signaturePreviewBox: document.getElementById('signaturePreviewBox'),
+  signaturePreviewImg: document.getElementById('signaturePreviewImg'),
   
   toastContainer: document.getElementById('toastContainer'),
 };
@@ -392,7 +410,35 @@ function closeJobModal() {
   if (elements.btnNewBatch) elements.btnNewBatch.focus();
 }
 
+function clearSignature() {
+  state.currentSignatureData = null;
+  if (elements.signatureFileInput) elements.signatureFileInput.value = '';
+  if (elements.signaturePreviewBox) elements.signaturePreviewBox.style.display = 'none';
+  if (elements.signaturePreviewImg) elements.signaturePreviewImg.src = '';
+  if (elements.btnClearSignature) elements.btnClearSignature.style.display = 'none';
+}
+
+function handleSignatureFileSelect(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('Signature must be a valid PNG or JPEG image', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.currentSignatureData = e.target.result;
+    if (elements.signaturePreviewImg) elements.signaturePreviewImg.src = e.target.result;
+    if (elements.signaturePreviewBox) elements.signaturePreviewBox.style.display = 'inline-flex';
+    if (elements.btnClearSignature) elements.btnClearSignature.style.display = 'inline-flex';
+  };
+  reader.onerror = () => {
+    showToast('Failed to read signature image', 'error');
+  };
+  reader.readAsDataURL(file);
+}
+
 function resetRecipients() {
+  clearSignature();
   elements.recipientsContainer.innerHTML = `
     <div class="recipient-entry">
       <input type="text" class="form-input recipient-name" placeholder="Recipient Full Name" required>
@@ -496,15 +542,20 @@ async function handleJobSubmit(e) {
   elements.btnSubmitJob.textContent = 'Queueing Batch...';
 
   try {
+    const payload = {
+      title,
+      organization,
+      date_of_issue,
+      recipients,
+    };
+    if (state.currentSignatureData) {
+      payload.signature_data = state.currentSignatureData;
+    }
+
     const res = await fetch('/api/jobs/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        organization,
-        date_of_issue,
-        recipients,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -527,6 +578,88 @@ async function handleJobSubmit(e) {
   } finally {
     elements.btnSubmitJob.disabled = false;
     elements.btnSubmitJob.textContent = 'Generate Certificates';
+  }
+}
+
+// --- Live WebSockets Job Tracking ---
+let liveRefreshTimer = null;
+function debounceRefresh() {
+  if (liveRefreshTimer) return;
+  liveRefreshTimer = setTimeout(() => {
+    liveRefreshTimer = null;
+    fetchCertificates();
+    fetchStats();
+  }, 1000);
+}
+
+function handleLiveJobEvent(event) {
+  if (!event || !event.event) return;
+
+  const { event: evtType, job_id, title, total, processed, percent, current_recipient } = event;
+
+  if (evtType === 'job_started' || evtType === 'job_progress') {
+    if (elements.liveJobBanner) {
+      elements.liveJobBanner.style.display = 'block';
+      if (elements.liveJobTitle) elements.liveJobTitle.textContent = title || `Job ${job_id ? job_id.slice(0, 8) : ''}`;
+      if (elements.liveJobProgressText) elements.liveJobProgressText.textContent = `${processed || 0} / ${total || 0}`;
+      const pct = percent != null ? percent : (total > 0 ? Math.round((processed / total) * 100) : 0);
+      if (elements.liveJobPercent) elements.liveJobPercent.textContent = `${pct}%`;
+      if (elements.liveProgressBar) elements.liveProgressBar.style.width = `${pct}%`;
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = current_recipient || 'Processing...';
+    }
+
+    if (!state.selectedJobId || state.selectedJobId === job_id) {
+      debounceRefresh();
+    }
+  } else if (evtType === 'job_completed') {
+    if (elements.liveJobBanner) {
+      if (elements.liveJobPercent) elements.liveJobPercent.textContent = '100%';
+      if (elements.liveProgressBar) elements.liveProgressBar.style.width = '100%';
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = 'Batch Completed';
+      setTimeout(() => {
+        if (elements.liveJobBanner) elements.liveJobBanner.style.display = 'none';
+      }, 3500);
+    }
+    showToast(`Batch completed: ${title || (job_id ? job_id.slice(0, 8) : '')} (${total || 0} certificates ready)`, 'success');
+    fetchStats();
+    fetchJobs();
+    fetchCertificates();
+  }
+}
+
+function initWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/jobs`;
+
+  try {
+    const ws = new WebSocket(wsUrl);
+    state.socket = ws;
+
+    ws.onopen = () => {
+      state.reconnectAttempts = 0;
+      console.log('[WS] Connected to live job stream');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleLiveJobEvent(data);
+      } catch (err) {
+        console.error('[WS] Parse error:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      const delay = Math.min(10000, 1000 * Math.pow(2, state.reconnectAttempts || 0));
+      state.reconnectAttempts = (state.reconnectAttempts || 0) + 1;
+      setTimeout(initWebSocket, delay);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  } catch (err) {
+    console.error('[WS] Connection error:', err);
   }
 }
 
@@ -611,6 +744,23 @@ function setupEventListeners() {
       if (file) handleRecipientFileUpload(file);
     });
   }
+
+  // Signature Upload
+  if (elements.btnUploadSignature && elements.signatureFileInput) {
+    elements.btnUploadSignature.addEventListener('click', () => {
+      elements.signatureFileInput.click();
+    });
+    elements.signatureFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) handleSignatureFileSelect(file);
+    });
+  }
+  if (elements.btnClearSignature) {
+    elements.btnClearSignature.addEventListener('click', () => {
+      clearSignature();
+    });
+  }
+
   elements.jobForm.addEventListener('submit', handleJobSubmit);
 
   elements.btnClosePreview.addEventListener('click', closePreview);
@@ -636,4 +786,5 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchStats();
   fetchJobs();
   fetchCertificates();
+  initWebSocket();
 });

@@ -62,6 +62,9 @@ class JobCreateRequest(BaseModel):
         max_length=1000,
         description="List of recipients (1 to 1000 recipients per batch)",
     )
+    signature_data: str | None = Field(
+        None, description="Optional base64 encoded signature image (PNG/JPEG)"
+    )
 
     @field_validator("title")
     @classmethod

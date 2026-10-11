@@ -1,10 +1,9 @@
-"""FastAPI application initialization, static assets, and lifespan management."""
-
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.database import init_db
 from app.routers.jobs import router as jobs_router
+from app.websockets import manager as ws_manager
+from app.websockets import start_redis_listener
 
 settings = get_settings()
 
@@ -27,7 +28,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Ensure output storage directory exists
     Path(settings.output_dir).mkdir(parents=True, exist_ok=True)
 
-    yield
+    # Start background Redis PubSub listener for WebSockets
+    redis_task = asyncio.create_task(
+        start_redis_listener(ws_manager, settings.redis_url)
+    )
+
+    try:
+        yield
+    finally:
+        redis_task.cancel()
 
 
 app = FastAPI(
@@ -57,6 +66,20 @@ if STATIC_DIR.is_dir():
 
 # Mount API routers
 app.include_router(jobs_router)
+
+
+@app.websocket("/ws/jobs")
+async def websocket_jobs(websocket: WebSocket) -> None:
+    """Live WebSocket endpoint for streaming job progress and certificate updates."""
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection open / listen for heartbeat ping
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception:
+        ws_manager.disconnect(websocket)
 
 
 @app.get("/", tags=["UI Dashboard"], summary="Certificate File Manager Dashboard")

@@ -34,7 +34,9 @@ FORBIDDEN_FILES = {
 }
 SUSPICIOUS_PATTERNS = [
     re.compile(r"-----BEGIN (RSA|EC|OPENSSH|DSA|PGP) PRIVATE KEY-----"),
-    re.compile(r"""(?i)(aws_secret_access_key|password)\s*=\s*['"][a-zA-Z0-9/+=]{20,}['"]"""),
+    re.compile(
+        r"""(?i)(aws_secret_access_key|password)\s*=\s*['"][a-zA-Z0-9/+=]{20,}['"]"""
+    ),
 ]
 
 
@@ -75,7 +77,8 @@ def check_file_limits(staged_files: list[str]) -> list[str]:
         # 1. Forbidden files
         if p.name in FORBIDDEN_FILES:
             errors.append(
-                f"Forbidden file staged: '{file_path_str}'. Sensitive/environment files must not be committed."
+                f"Forbidden file staged: '{file_path_str}'. "
+                "Sensitive/environment files must not be committed."
             )
 
         # 2. Forbidden extensions
@@ -113,7 +116,8 @@ def check_secret_patterns() -> list[str]:
             match = pattern.search(diff_text)
             if match:
                 errors.append(
-                    f"Potential secret detected in staged changes matching: {pattern.pattern}"
+                    "Potential secret detected in staged changes matching: "
+                    f"{pattern.pattern}"
                 )
     except Exception:
         pass
@@ -131,7 +135,8 @@ def check_code_invariants() -> list[str]:
             limit = int(match.group(1))
             if limit > 5000:
                 errors.append(
-                    f"Batch recipient limit too high in app/config.py ({limit} > 5000 allowed)."
+                    "Batch recipient limit too high in app/config.py "
+                    f"({limit} > 5000 allowed)."
                 )
     return errors
 

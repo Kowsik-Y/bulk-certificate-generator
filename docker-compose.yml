@@ -1,15 +1,55 @@
 services:
   redis:
     image: redis:7-alpine
+    container_name: certificate_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: certificate_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:////data/certificates.db
+      - OUTPUT_DIR=/data/output
+    volumes:
+      - app_data:/data
+      - ./output:/data/output
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: certificate_worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:////data/certificates.db
+      - OUTPUT_DIR=/data/output
+    volumes:
+      - app_data:/data
+      - ./output:/data/output
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=info"]
 
 volumes:
   redis_data:
+  app_data:

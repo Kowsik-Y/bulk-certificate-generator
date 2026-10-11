@@ -67,44 +67,70 @@ graph TD
 - Python 3.11+
 - Docker & Docker Compose (for Redis) or local Redis server
 
-### 1. Clone & Set Up Virtual Environment
+### Option A: Run via Docker (Recommended — Single Command)
+
+Builds the application image and starts Redis, FastAPI, and Celery Worker containers simultaneously:
+
+**Linux / macOS:**
+```bash
+./docker-run.sh
+# Or: docker compose up --build
+```
+
+**Windows (PowerShell):**
+```powershell
+.\docker-run.ps1
+# Or: docker compose up --build
+```
+
+---
+
+### Option B: Interactive Initialization Scripts
+
+Use the automated initialization script to set up Python virtualenv, install dependencies, run Redis, and launch services:
+
+**Linux / macOS:**
+```bash
+./init.sh          # Interactive Menu
+./init.sh --docker # Directly launch Docker container stack
+./init.sh --local  # Set up venv and run locally on host
+./init.sh --test   # Run test suite with coverage
+```
+
+**Windows (PowerShell):**
+```powershell
+.\init.ps1               # Interactive Menu
+.\init.ps1 -Mode Docker  # Directly launch Docker container stack
+.\init.ps1 -Mode Local   # Set up venv and run locally on host
+.\init.ps1 -Mode Test    # Run test suite with coverage
+```
+
+---
+
+### Option C: Manual Local Setup (Step-by-Step)
 
 ```bash
-cd "Bulk Certificate Generator"
+# 1. Create & activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Start Redis Broker
+# 3. Start Redis broker
+docker compose up -d redis
 
-```bash
-docker compose up -d
-```
-
-*(Or verify local Redis is running on `redis://localhost:6379/0`)*
-
-### 3. Run Celery Worker
-
-In a dedicated terminal window:
-
-```bash
-source venv/bin/activate
+# 4. Terminal 1: Start Celery worker
 celery -A app.celery_app:celery_app worker --loglevel=info
-```
 
-### 4. Run API Server
-
-In another terminal window:
-
-```bash
-source venv/bin/activate
+# 5. Terminal 2: Start FastAPI web server
 uvicorn app.main:app --reload --port 8000
 ```
 
-Interactive API documentation will be available at:
+Interactive API documentation:
 - Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 - ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
 
 ---
 
@@ -262,8 +288,14 @@ Bulk Certificate Generator/
 │   ├── test_service.py            # JobService business logic tests
 │   ├── test_tasks.py              # Celery task retry tests
 │   └── test_failure_handling.py   # Partial failure resilience tests
-├── docker-compose.yml             # Redis container configuration
+├── docker-compose.yml             # Full stack container configuration (Redis, API, Worker)
+├── Dockerfile                     # Multi-stage container build image
+├── init.sh                        # POSIX Bash initialization & runner script
+├── init.ps1                       # Windows PowerShell initialization & runner script
+├── docker-run.sh                  # One-command Docker stack launcher (Linux/macOS)
+├── docker-run.ps1                 # One-command Docker stack launcher (Windows)
 ├── pyproject.toml                 # Tool configuration (Ruff, Pytest, Coverage)
 ├── requirements.txt               # Dependencies
 └── README.md
 ```
+

@@ -6,7 +6,6 @@
   <title>Bulk Certificate Manager — High Performance Dashboard</title>
   <meta name="description" content="Manage, preview, search, and download generated PDF certificates in bulk with Celery and FastAPI.">
   <link rel="stylesheet" href="/static/css/styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
 </head>
 <body>
   <div class="app-container">
@@ -14,10 +13,14 @@
     <!-- Top Navigation Bar -->
     <header class="navbar" id="mainNavbar">
       <a href="/" class="brand" id="brandLogo">
-        <div class="brand-icon">🎓</div>
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
         <div class="brand-text">
           <h1>CertManager</h1>
-          <p>Bulk Certificate Generator & File Hub</p>
+          <p>Bulk Certificate Generator &amp; File Hub</p>
         </div>
       </a>
       <div class="nav-actions">
@@ -26,13 +29,13 @@
           <span id="storageBackendText">Storage: Local Disk</span>
         </div>
         <a href="http://localhost:9001" target="_blank" class="btn btn-rustfs" id="btnRustFSConsole" title="Open RustFS Web Management Console" style="display: none;">
-          🦀 RustFS Console
+          RustFS Console
         </a>
         <a href="/docs" target="_blank" class="btn btn-secondary" id="btnApiDocs" title="Open Swagger OpenAPI Documentation">
-          📖 API Docs
+          API Docs
         </a>
         <button class="btn btn-primary" id="btnNewBatch">
-          ✨ Generate New Batch
+          + Generate New Batch
         </button>
       </div>
     </header>
@@ -40,28 +43,51 @@
     <!-- Metrics Stats Grid -->
     <section class="stats-grid" id="statsGrid" aria-label="System Metrics">
       <div class="stat-card" id="cardTotalCerts">
-        <div class="stat-icon certs">📜</div>
+        <div class="stat-icon certs">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
         <div class="stat-content">
           <div class="stat-label">Certificates</div>
           <div class="stat-value" id="statTotalCerts">0</div>
         </div>
       </div>
       <div class="stat-card" id="cardTotalJobs">
-        <div class="stat-icon jobs">⚡</div>
+        <div class="stat-icon jobs">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
         <div class="stat-content">
           <div class="stat-label">Total Batches</div>
           <div class="stat-value" id="statTotalJobs">0</div>
         </div>
       </div>
       <div class="stat-card" id="cardSuccessRate">
-        <div class="stat-icon success">🎯</div>
+        <div class="stat-icon success">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="9 12 12 15 16 10"/>
+          </svg>
+        </div>
         <div class="stat-content">
           <div class="stat-label">Success Rate</div>
           <div class="stat-value" id="statSuccessRate">100%</div>
         </div>
       </div>
       <div class="stat-card" id="cardStorageUsed">
-        <div class="stat-icon storage">💾</div>
+        <div class="stat-icon storage">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+        </div>
         <div class="stat-content">
           <div class="stat-label">Storage Used</div>
           <div class="stat-value" id="statStorageUsed">0.0 KB</div>
@@ -76,7 +102,12 @@
       <div class="manager-toolbar" id="managerToolbar">
         <div class="toolbar-left">
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <span class="search-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </span>
             <input type="text" id="searchInput" placeholder="Search by recipient or email..." autocomplete="off">
           </div>
           
@@ -94,14 +125,18 @@
 
         <div class="toolbar-right">
           <button class="btn btn-secondary" id="btnDownloadZip" style="display:none;" title="Download all ready certificates in this batch as a ZIP">
-            📦 Download Batch ZIP
+            Download Batch ZIP
           </button>
           <button class="btn btn-secondary btn-icon" id="btnRefresh" title="Refresh files and metrics">
-            🔄
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
           </button>
           <div class="view-toggle">
-            <button class="toggle-btn active" id="btnViewTable" title="Table View">☰</button>
-            <button class="toggle-btn" id="btnViewGrid" title="Card Grid View">⊞</button>
+            <button class="toggle-btn active" id="btnViewTable" title="Table View">Table</button>
+            <button class="toggle-btn" id="btnViewGrid" title="Card Grid View">Grid</button>
           </div>
         </div>
       </div>
@@ -119,14 +154,14 @@
     <div class="modal-box preview-box">
       <div class="modal-header">
         <h3 id="previewTitle">Certificate Preview</h3>
-        <button class="btn-icon" id="btnClosePreview" aria-label="Close Preview Modal">✕</button>
+        <button class="btn-icon" id="btnClosePreview" aria-label="Close Preview Modal">&times;</button>
       </div>
       <div class="modal-body" style="padding:12px; background:#0B0F19">
         <iframe class="pdf-preview-frame" id="previewIframe" src="about:blank" title="Certificate PDF Viewer"></iframe>
       </div>
       <div class="modal-footer">
         <a href="#" class="btn btn-primary" id="btnPreviewDownload" download>
-          ⬇️ Download PDF
+          Download PDF
         </a>
       </div>
     </div>
@@ -137,13 +172,13 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="jobModalTitle">Create Bulk Certificate Generation Job</h3>
-        <button class="btn-icon" id="btnCloseJobModal" aria-label="Close Job Modal">✕</button>
+        <button class="btn-icon" id="btnCloseJobModal" aria-label="Close Job Modal">&times;</button>
       </div>
       <form id="jobForm">
         <div class="modal-body">
           <div class="form-group">
             <label for="jobTitle">Course / Event Title *</label>
-            <input type="text" id="jobTitle" class="form-input" placeholder="e.g. Advanced Distributed Systems & Cloud Architecture" required>
+            <input type="text" id="jobTitle" class="form-input" placeholder="e.g. Advanced Distributed Systems &amp; Cloud Architecture" required>
           </div>
 
           <div class="form-row">

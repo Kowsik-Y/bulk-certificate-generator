@@ -57,8 +57,9 @@ const elements = {
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
+  const tag = type === 'success' ? '[OK]' : type === 'error' ? '[ERR]' : '[INFO]';
   toast.innerHTML = `
-    <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+    <span style="font-weight:700; font-size:0.75rem">${tag}</span>
     <span>${message}</span>
   `;
   elements.toastContainer.appendChild(toast);
@@ -143,7 +144,7 @@ async function fetchCertificates(showSpinner = true) {
   if (showSpinner) {
     elements.filesContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">⌛</div>
+        <div class="empty-state-icon">Loading</div>
         <p>Loading certificate files...</p>
       </div>
     `;
@@ -174,7 +175,7 @@ async function fetchCertificates(showSpinner = true) {
   } catch (err) {
     elements.filesContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-icon">Error</div>
         <p>Error loading certificate files: ${err.message}</p>
       </div>
     `;
@@ -186,7 +187,7 @@ function renderCertificates() {
   if (state.certificates.length === 0) {
     elements.filesContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📄</div>
+        <div class="empty-state-icon">Empty</div>
         <h3>No Certificates Found</h3>
         <p>No certificate files matched the current filters or query.</p>
       </div>
@@ -231,14 +232,24 @@ function renderTableView() {
           <div style="display:flex; gap:6px; justify-content:flex-end">
             ${cert.status === 'success' ? `
               <button class="btn btn-secondary btn-icon" title="Preview PDF" onclick="openPreview('${cert.id}', '${escapeAttr(cert.recipient_name)}')">
-                👁️
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
               </button>
               <a href="${cert.presigned_url || cert.download_url}" class="btn btn-secondary btn-icon" title="Download PDF" download>
-                ⬇️
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
               </a>
             ` : ''}
             <button class="btn btn-danger btn-icon" title="Delete Certificate" onclick="deleteCertificate('${cert.id}')">
-              🗑️
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
             </button>
           </div>
         </td>
@@ -295,8 +306,11 @@ function renderGridView() {
               Download
             </a>
           ` : ''}
-          <button class="btn btn-danger btn-icon" onclick="deleteCertificate('${cert.id}')">
-            🗑️
+          <button class="btn btn-danger btn-icon" title="Delete Certificate" onclick="deleteCertificate('${cert.id}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -309,13 +323,13 @@ function renderGridView() {
 function getStatusBadge(status) {
   switch (status) {
     case 'success':
-      return `<span class="badge badge-success">✓ Ready</span>`;
+      return `<span class="badge badge-success">Ready</span>`;
     case 'failed':
-      return `<span class="badge badge-failed">✕ Failed</span>`;
+      return `<span class="badge badge-failed">Failed</span>`;
     case 'processing':
-      return `<span class="badge badge-processing">⚙ Rendering</span>`;
+      return `<span class="badge badge-processing">Rendering</span>`;
     default:
-      return `<span class="badge badge-pending">⌛ Queued</span>`;
+      return `<span class="badge badge-pending">Queued</span>`;
   }
 }
 
@@ -389,7 +403,7 @@ function addRecipientRow() {
   row.innerHTML = `
     <input type="text" class="form-input recipient-name" placeholder="Recipient Full Name" required>
     <input type="email" class="form-input recipient-email" placeholder="Email (optional)">
-    <button type="button" class="btn btn-danger btn-icon" onclick="this.parentElement.remove()">✕</button>
+    <button type="button" class="btn btn-danger btn-icon" title="Remove Recipient" onclick="this.parentElement.remove()">&times;</button>
   `;
   elements.recipientsContainer.appendChild(row);
 }

@@ -679,10 +679,12 @@ async function handleJobSubmit(e) {
       if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = 'Queued in background worker...';
     }
     
-    // Select newly submitted job
-    state.selectedJobId = data.job_id;
+    // Keep view on All Jobs / Batches so previously generated files remain visible
+    state.selectedJobId = '';
+    if (elements.jobFilterSelect) {
+      elements.jobFilterSelect.value = '';
+    }
     await fetchJobs();
-    elements.jobFilterSelect.value = data.job_id;
     fetchCertificates();
     fetchStats();
   } catch (err) {
@@ -740,6 +742,17 @@ function handleLiveJobEvent(event) {
       }, 4000);
     }
     showToast(`Batch completed: ${title || (job_id ? job_id.slice(0, 8) : '')} (${total || 0} certificates ready)`, 'success');
+    fetchStats();
+    fetchJobs();
+    fetchCertificates();
+  } else if (evtType === 'job_failed') {
+    if (elements.liveJobBanner) {
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = `Batch failed: ${event.error || 'Worker error'}`;
+      setTimeout(() => {
+        if (elements.liveJobBanner) elements.liveJobBanner.style.display = 'none';
+      }, 5000);
+    }
+    showToast(`Batch failed: ${event.error || 'Worker error'}`, 'error');
     fetchStats();
     fetchJobs();
     fetchCertificates();

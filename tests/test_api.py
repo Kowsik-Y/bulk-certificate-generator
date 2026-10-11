@@ -470,3 +470,100 @@ def test_certificate_filtering_and_delete_failed(
     del_res = client.delete(f"/api/certificates/{c_fail.id}/")
     assert del_res.status_code == 200
     assert job.failed_count == 0
+
+
+def test_parse_recipients_from_json(client: TestClient) -> None:
+    """Verify parsing recipient lists from uploaded JSON file."""
+    import json
+
+    json_data = json.dumps(
+        [
+            {"name": "Alice Wonder", "email": "alice@wonder.com"},
+            {"name": "Bob Builder", "email": "bob@builder.com"},
+        ]
+    ).encode("utf-8")
+
+    response = client.post(
+        "/api/recipients/parse-file/",
+        files={"file": ("participants.json", json_data, "application/json")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_count"] == 2
+    assert data["recipients"][0]["name"] == "Alice Wonder"
+    assert data["recipients"][1]["name"] == "Bob Builder"
+
+
+def test_parse_recipients_from_csv(client: TestClient) -> None:
+    """Verify parsing recipient lists from uploaded CSV file."""
+    csv_data = "Name,Email\nJohn Doe,john@example.com\nJane Smith,\n".encode("utf-8")
+
+    response = client.post(
+        "/api/recipients/parse-file/",
+        files={"file": ("users.csv", csv_data, "text/csv")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_count"] == 2
+    assert data["recipients"][0]["name"] == "John Doe"
+    assert data["recipients"][0]["email"] == "john@example.com"
+    assert data["recipients"][1]["name"] == "Jane Smith"
+    assert data["recipients"][1]["email"] is None
+
+
+def test_parse_recipients_from_excel(client: TestClient) -> None:
+    """Verify parsing recipient lists from uploaded Excel (.xlsx) file."""
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.append(["Full Name", "Email Address"])
+    ws.append(["Emma Watson", "emma@actors.org"])
+    ws.append(["Daniel Radcliffe", "daniel@actors.org"])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    excel_data = buf.getvalue()
+
+    response = client.post(
+        "/api/recipients/parse-file/",
+        files={
+            "file": (
+                "cast.xlsx",
+                excel_data,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_count"] == 2
+    assert data["recipients"][0]["name"] == "Emma Watson"
+    assert data["recipients"][1]["name"] == "Daniel Radcliffe"
+
+
+def test_parse_recipients_invalid_or_empty_file(client: TestClient) -> None:
+    """Verify error handling for invalid or empty files."""
+    # Empty file
+    resp_empty = client.post(
+        "/api/recipients/parse-file/",
+        files={"file": ("empty.json", b"", "application/json")},
+    )
+    assert resp_empty.status_code == 400
+
+    # Unsupported format
+    resp_unsupported = client.post(
+        "/api/recipients/parse-file/",
+        files={"file": ("data.pdf", b"%PDF-1.4...", "application/pdf")},
+    )
+    assert resp_unsupported.status_code == 400
+
+    # Malformed JSON
+    resp_bad_json = client.post(
+        "/api/recipients/parse-file/",
+        files={"file": ("bad.json", b"{invalid json", "application/json")},
+    )
+    assert resp_bad_json.status_code == 400

@@ -48,6 +48,9 @@ const elements = {
   btnCancelJobModal: document.getElementById('btnCancelJobModal'),
   recipientsContainer: document.getElementById('recipientsContainer'),
   btnAddRecipient: document.getElementById('btnAddRecipient'),
+  btnUploadRecipientsFile: document.getElementById('btnUploadRecipientsFile'),
+  recipientFileInput: document.getElementById('recipientFileInput'),
+  fileUploadStatus: document.getElementById('fileUploadStatus'),
   btnSubmitJob: document.getElementById('btnSubmitJob'),
   
   toastContainer: document.getElementById('toastContainer'),
@@ -207,6 +210,7 @@ function renderTableView() {
     const statusBadge = getStatusBadge(cert.status);
     const size = cert.file_size_formatted || (cert.status === 'success' ? 'Ready' : '—');
     const isS3 = ['s3', 'rustfs', 'minio'].includes((cert.storage_backend || '').toLowerCase());
+    const date = cert.created_at ? new Date(cert.created_at).toLocaleDateString() : '—';
 
     return `
       <tr>
@@ -395,17 +399,73 @@ function resetRecipients() {
       <input type="email" class="form-input recipient-email" placeholder="Email (optional)">
     </div>
   `;
+  if (elements.fileUploadStatus) {
+    elements.fileUploadStatus.textContent = '';
+    elements.fileUploadStatus.style.display = 'none';
+  }
+  if (elements.recipientFileInput) {
+    elements.recipientFileInput.value = '';
+  }
 }
 
-function addRecipientRow() {
+function addRecipientRow(name = '', email = '') {
   const row = document.createElement('div');
   row.className = 'recipient-entry';
   row.innerHTML = `
-    <input type="text" class="form-input recipient-name" placeholder="Recipient Full Name" required>
-    <input type="email" class="form-input recipient-email" placeholder="Email (optional)">
+    <input type="text" class="form-input recipient-name" value="${escapeAttr(name)}" placeholder="Recipient Full Name" required>
+    <input type="email" class="form-input recipient-email" value="${escapeAttr(email)}" placeholder="Email (optional)">
     <button type="button" class="btn btn-danger btn-icon" title="Remove Recipient" onclick="this.parentElement.remove()">&times;</button>
   `;
   elements.recipientsContainer.appendChild(row);
+}
+
+// --- Import Recipients from JSON, CSV, or Excel File ---
+async function handleRecipientFileUpload(file) {
+  if (!file) return;
+
+  if (elements.fileUploadStatus) {
+    elements.fileUploadStatus.style.display = 'block';
+    elements.fileUploadStatus.style.color = 'var(--text-muted)';
+    elements.fileUploadStatus.textContent = `Parsing ${file.name}...`;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/recipients/parse-file/', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || 'Failed to parse file');
+    }
+
+    const data = await res.json();
+    if (!data.recipients || data.recipients.length === 0) {
+      throw new Error('No valid recipients found in uploaded file');
+    }
+
+    // Populate recipients rows
+    elements.recipientsContainer.innerHTML = '';
+    data.recipients.forEach(rec => {
+      addRecipientRow(rec.name, rec.email || '');
+    });
+
+    if (elements.fileUploadStatus) {
+      elements.fileUploadStatus.style.color = 'var(--emerald-success)';
+      elements.fileUploadStatus.textContent = `Imported ${data.total_count} recipient(s) from ${file.name}`;
+    }
+    showToast(`Loaded ${data.total_count} recipient(s) from ${file.name}`, 'success');
+  } catch (err) {
+    if (elements.fileUploadStatus) {
+      elements.fileUploadStatus.style.color = 'var(--rose-danger)';
+      elements.fileUploadStatus.textContent = `Upload error: ${err.message}`;
+    }
+    showToast(err.message, 'error');
+  }
 }
 
 async function handleJobSubmit(e) {
@@ -541,7 +601,16 @@ function setupEventListeners() {
   elements.btnNewBatch.addEventListener('click', openJobModal);
   elements.btnCloseJobModal.addEventListener('click', closeJobModal);
   elements.btnCancelJobModal.addEventListener('click', closeJobModal);
-  elements.btnAddRecipient.addEventListener('click', addRecipientRow);
+  elements.btnAddRecipient.addEventListener('click', () => addRecipientRow());
+  if (elements.btnUploadRecipientsFile && elements.recipientFileInput) {
+    elements.btnUploadRecipientsFile.addEventListener('click', () => {
+      elements.recipientFileInput.click();
+    });
+    elements.recipientFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) handleRecipientFileUpload(file);
+    });
+  }
   elements.jobForm.addEventListener('submit', handleJobSubmit);
 
   elements.btnClosePreview.addEventListener('click', closePreview);

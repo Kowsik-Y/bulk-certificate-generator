@@ -177,3 +177,11 @@ class SystemStatsResponse(BaseModel):
     total_storage_formatted: str
     storage_backend: str = "local"
     bucket_name: str | None = None
+
+
+class ParseRecipientsResponse(BaseModel):
+    """Schema for parsed recipient list uploaded from file."""
+
+    recipients: list[RecipientRequest]
+    total_count: int
+    filename: str

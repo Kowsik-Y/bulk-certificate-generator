@@ -1,9 +1,12 @@
-"""API router endpoints for bulk certificate jobs and certificate downloads."""
-
+import csv
+import io
+import json
 import re
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import openpyxl
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -15,6 +18,8 @@ from app.schemas import (
     JobCreateRequest,
     JobCreateResponse,
     JobStatusResponse,
+    ParseRecipientsResponse,
+    RecipientRequest,
     SystemStatsResponse,
 )
 from app.services.job_service import JobService
@@ -28,6 +33,230 @@ def sanitize_filename(name: str) -> str:
     """Sanitize recipient name for safe HTTP attachment filename."""
     clean = re.sub(r"[^\w\s-]", "", name).strip()
     return re.sub(r"[-\s]+", "_", clean) or "recipient"
+
+
+def parse_recipients_from_bytes(
+    filename: str, content: bytes
+) -> list[RecipientRequest]:
+    """Parse recipient records from JSON, CSV, or Excel bytes."""
+    ext = Path(filename).suffix.lower()
+    recipients: list[RecipientRequest] = []
+
+    def _extract_dict(item: dict[str, Any]) -> RecipientRequest | None:
+        name = (
+            item.get("name")
+            or item.get("recipient_name")
+            or item.get("FullName")
+            or item.get("full_name")
+            or item.get("Name")
+            or item.get("Recipient")
+            or ""
+        )
+        if not isinstance(name, str) or not name.strip():
+            return None
+        email = (
+            item.get("email")
+            or item.get("recipient_email")
+            or item.get("Email")
+            or item.get("Mail")
+            or None
+        )
+        if email and isinstance(email, str):
+            email = email.strip() or None
+        else:
+            email = None
+        try:
+            return RecipientRequest(name=name.strip(), email=email)
+        except Exception:
+            return None
+
+    if ext == ".json":
+        try:
+            parsed = json.loads(content.decode("utf-8-sig"))
+            if isinstance(parsed, dict) and "recipients" in parsed:
+                parsed = parsed["recipients"]
+            if not isinstance(parsed, list):
+                raise ValueError(
+                    "JSON must be a list of recipients or an object with "
+                    "'recipients' array."
+                )
+            for row in parsed:
+                if isinstance(row, dict):
+                    rec = _extract_dict(row)
+                    if rec:
+                        recipients.append(rec)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid JSON format: {e}",
+            ) from e
+
+    elif ext in [".csv", ".txt"]:
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+        reader = csv.reader(io.StringIO(text))
+        rows = [r for r in reader if any(c.strip() for c in r)]
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV file is empty.",
+            )
+        first_row = [c.strip().lower() for c in rows[0]]
+        name_idx = -1
+        email_idx = -1
+        for idx, col in enumerate(first_row):
+            if col in ["name", "recipient_name", "full name", "fullname", "recipient"]:
+                name_idx = idx
+            elif col in ["email", "recipient_email", "mail", "e-mail"]:
+                email_idx = idx
+
+        start_row = 1 if name_idx != -1 else 0
+        if name_idx == -1:
+            name_idx = 0
+            email_idx = 1 if len(rows[0]) > 1 else -1
+
+        for row in rows[start_row:]:
+            if not row or len(row) <= name_idx:
+                continue
+            name_val = row[name_idx].strip()
+            if not name_val:
+                continue
+            email_val = (
+                row[email_idx].strip()
+                if (email_idx != -1 and len(row) > email_idx)
+                else None
+            )
+            try:
+                recipients.append(
+                    RecipientRequest(name=name_val, email=email_val or None)
+                )
+            except Exception:
+                continue
+
+    elif ext in [".xlsx", ".xls"]:
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            sheet = wb.active
+            if sheet is None:
+                raise ValueError("No active worksheet found in Excel file.")
+            sheet_rows = list(sheet.iter_rows(values_only=True))
+            if not sheet_rows:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Excel spreadsheet is empty.",
+                )
+            name_col = -1
+            email_col = -1
+            header_row_idx = 0
+            for r_idx, row in enumerate(sheet_rows):
+                for c_idx, val in enumerate(row):
+                    if val is None:
+                        continue
+                    v_str = str(val).strip().lower()
+                    if v_str in [
+                        "name",
+                        "recipient_name",
+                        "full name",
+                        "fullname",
+                        "recipient",
+                    ]:
+                        name_col = c_idx
+                        header_row_idx = r_idx
+                    elif v_str in ["email", "recipient_email", "mail", "e-mail"]:
+                        email_col = c_idx
+
+                if name_col != -1:
+                    break
+
+            start_r = header_row_idx + 1 if name_col != -1 else 0
+            if name_col == -1:
+                name_col = 0
+                email_col = 1 if len(sheet_rows[0]) > 1 else -1
+
+            for row in sheet_rows[start_r:]:
+                if not row or len(row) <= name_col:
+                    continue
+                raw_name = row[name_col]
+                if raw_name is None:
+                    continue
+                name_val = str(raw_name).strip()
+                if not name_val:
+                    continue
+                raw_email = (
+                    row[email_col]
+                    if (email_col != -1 and len(row) > email_col)
+                    else None
+                )
+                email_val = str(raw_email).strip() if raw_email is not None else None
+                try:
+                    recipients.append(
+                        RecipientRequest(name=name_val, email=email_val or None)
+                    )
+                except Exception:
+                    continue
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Error reading Excel file: {e}",
+            ) from e
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Unsupported format '{ext}'. "
+                "Please upload a .json, .csv, or .xlsx file."
+            ),
+        )
+
+    if not recipients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"No valid recipient records found in '{filename}'. "
+                "Ensure there is a 'name' column or field."
+            ),
+        )
+
+    if len(recipients) > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Batch size of {len(recipients)} exceeds "
+                "maximum allowed limit of 1000 recipients."
+            ),
+        )
+
+    return recipients
+
+
+@router.post(
+    "/api/recipients/parse-file/",
+    response_model=ParseRecipientsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Parse recipients from JSON, CSV, or Excel file",
+    description="Upload a .json, .csv, or .xlsx file to extract recipients.",
+)
+async def parse_recipients_file(
+    file: UploadFile = File(...),
+) -> ParseRecipientsResponse:
+    """Parse recipient records from uploaded JSON, CSV, or Excel file."""
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+    filename = file.filename or "uploaded_file"
+    recipients = parse_recipients_from_bytes(filename, content)
+    return ParseRecipientsResponse(
+        recipients=recipients,
+        total_count=len(recipients),
+        filename=filename,
+    )
 
 
 @router.post(

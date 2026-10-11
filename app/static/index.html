@@ -193,12 +193,19 @@
           </div>
 
           <div class="form-group" style="margin-top:20px;">
-            <div class="recipients-header">
+            <div class="recipients-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <label style="margin-bottom:0">Recipients List *</label>
-              <button type="button" class="btn btn-secondary" id="btnAddRecipient" style="padding:4px 10px; font-size:0.75rem">
-                + Add Recipient
-              </button>
+              <div style="display:flex; gap:8px;">
+                <input type="file" id="recipientFileInput" accept=".json,.csv,.xlsx,.xls,.txt" style="display:none">
+                <button type="button" class="btn btn-secondary" id="btnUploadRecipientsFile" style="padding:4px 10px; font-size:0.75rem" title="Import recipients from JSON, Excel (.xlsx), or CSV">
+                  Upload JSON / Excel / CSV
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnAddRecipient" style="padding:4px 10px; font-size:0.75rem">
+                  + Add Row
+                </button>
+              </div>
             </div>
+            <div id="fileUploadStatus" style="font-size:0.75rem; color:var(--emerald-success); margin:6px 0; display:none;"></div>
             <div id="recipientsContainer">
               <!-- Dynamically populated rows -->
             </div>

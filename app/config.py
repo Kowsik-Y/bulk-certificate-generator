@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./certificates.db"
     redis_url: str = "redis://localhost:6379/0"
-    output_dir: str = "./output"
+    output_dir: str = "/tmp/bulk_certificates_output"
     app_title: str = "Bulk Certificate Generator API"
     app_version: str = "0.1.0"
     max_recipients_per_batch: int = 1000

@@ -31,15 +31,25 @@ def test_one_failure_does_not_block_others(
     from app.generator import certificate_generator
 
     original_generate = certificate_generator.generate_certificate
+    original_generate_bytes = certificate_generator.generate_certificate_bytes
 
     def mock_generate(recipient_name: str, **kwargs):
         if recipient_name == "Failing Recipient":
             raise RuntimeError("Simulated render engine crash for test")
         return original_generate(recipient_name=recipient_name, **kwargs)
 
+    def mock_generate_bytes(recipient_name: str, **kwargs):
+        if recipient_name == "Failing Recipient":
+            raise RuntimeError("Simulated render engine crash for test")
+        return original_generate_bytes(recipient_name=recipient_name, **kwargs)
+
     monkeypatch.setattr(
         "app.services.job_service.generate_certificate",
         mock_generate,
+    )
+    monkeypatch.setattr(
+        "app.services.job_service.generate_certificate_bytes",
+        mock_generate_bytes,
     )
 
     processed_job = service.process_job(job.id)
@@ -80,6 +90,10 @@ def test_all_failures_still_marks_job_terminal(
 
     monkeypatch.setattr(
         "app.services.job_service.generate_certificate",
+        failing_generate,
+    )
+    monkeypatch.setattr(
+        "app.services.job_service.generate_certificate_bytes",
         failing_generate,
     )
 

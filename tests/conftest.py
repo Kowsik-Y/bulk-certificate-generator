@@ -63,11 +63,12 @@ def temp_output_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     out_dir = tmp_path / "test_output"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Override settings output_dir
+    # Override settings output_dir and storage_backend for local test isolation
     def mock_get_settings() -> Settings:
         return Settings(
             output_dir=str(out_dir),
             database_url=TEST_DATABASE_URL,
+            storage_backend="local",
         )
 
     from app.storage.local import LocalStorageBackend

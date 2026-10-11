@@ -381,7 +381,9 @@ class JobService:
                 "No generated certificates available to download in this job"
             )
 
-        zip_dir = Path(self.settings.output_dir) / "zips"
+        import tempfile
+
+        zip_dir = Path(tempfile.gettempdir()) / "cert_zips"
         zip_dir.mkdir(parents=True, exist_ok=True)
         zip_path = zip_dir / f"certificates_job_{job.id}.zip"
 
@@ -430,7 +432,9 @@ class JobService:
                 "No ready certificates available for download in the selected list"
             )
 
-        zip_dir = Path(self.settings.output_dir) / "zips"
+        import tempfile
+
+        zip_dir = Path(tempfile.gettempdir()) / "cert_zips"
         zip_dir.mkdir(parents=True, exist_ok=True)
         zip_path = zip_dir / f"selected_certificates_{uuid.uuid4().hex[:8]}.zip"
 

@@ -20,8 +20,8 @@ services:
       - "9000:9000"  # RustFS S3 API
       - "9001:9001"  # RustFS Web Management Console
     environment:
-      - RUSTFS_ACCESS_KEY=rustfsadmin
-      - RUSTFS_SECRET_KEY=rustfsadmin
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY_ID:-rustfsadmin}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_ACCESS_KEY:-rustfsadmin}
       - RUSTFS_ADDRESS=:9000
       - RUSTFS_CONSOLE_ADDRESS=:9001
       - RUSTFS_CONSOLE_ENABLE=true
@@ -37,19 +37,22 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:////data/certificates.db
-      - OUTPUT_DIR=/data/output
-      - STORAGE_BACKEND=rustfs
-      - S3_ENDPOINT_URL=http://rustfs:9000
-      - S3_ACCESS_KEY_ID=rustfsadmin
-      - S3_SECRET_ACCESS_KEY=rustfsadmin
-      - S3_BUCKET_NAME=certificates
-      - S3_REGION_NAME=us-east-1
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////data/certificates.db}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/data/output}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-rustfs}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://rustfs:9000}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-rustfsadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-certificates}
+      - S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - S3_USE_SSL=${S3_USE_SSL:-false}
     volumes:
       - app_data:/data
-      - ./output:/data/output
       - ./app:/app/app
     depends_on:
       redis:
@@ -64,19 +67,22 @@ services:
       dockerfile: Dockerfile
     container_name: certificate_worker
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:////data/certificates.db
-      - OUTPUT_DIR=/data/output
-      - STORAGE_BACKEND=rustfs
-      - S3_ENDPOINT_URL=http://rustfs:9000
-      - S3_ACCESS_KEY_ID=rustfsadmin
-      - S3_SECRET_ACCESS_KEY=rustfsadmin
-      - S3_BUCKET_NAME=certificates
-      - S3_REGION_NAME=us-east-1
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////data/certificates.db}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/data/output}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-rustfs}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://rustfs:9000}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-rustfsadmin}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-rustfsadmin}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-certificates}
+      - S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - S3_USE_SSL=${S3_USE_SSL:-false}
     volumes:
       - app_data:/data
-      - ./output:/data/output
       - ./app:/app/app
     depends_on:
       redis:

@@ -22,6 +22,7 @@ class JobRepository:
         total_recipients: int,
         job_id: str | None = None,
         signature_data: str | None = None,
+        template: str = "classic",
     ) -> Job:
         """Create and add a new Job record."""
         job_kwargs: dict[str, Any] = {
@@ -30,6 +31,7 @@ class JobRepository:
             "date_of_issue": date_of_issue,
             "total_recipients": total_recipients,
             "signature_data": signature_data,
+            "template": template or "classic",
             "status": "pending",
             "successful_count": 0,
             "failed_count": 0,

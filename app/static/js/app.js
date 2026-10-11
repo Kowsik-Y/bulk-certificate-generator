@@ -73,6 +73,12 @@ const elements = {
   signatureFileInput: document.getElementById('signatureFileInput'),
   signaturePreviewBox: document.getElementById('signaturePreviewBox'),
   signaturePreviewImg: document.getElementById('signaturePreviewImg'),
+
+  // Template and Sample Loaders
+  btnLoadSample1: document.getElementById('btnLoadSample1'),
+  btnLoadSample2: document.getElementById('btnLoadSample2'),
+  templateCardClassic: document.getElementById('templateCardClassic'),
+  templateCardModern: document.getElementById('templateCardModern'),
   
   toastContainer: document.getElementById('toastContainer'),
 };
@@ -319,6 +325,9 @@ function renderTableView() {
     const isChecked = state.selectedCertIds.has(cert.id);
     const isReady = cert.status === 'success';
 
+    const isModern = (cert.template || '').toLowerCase() === 'modern';
+    const templateBadge = `<span class="template-badge ${isModern ? 'template-badge-modern' : 'template-badge-classic'}">${isModern ? 'Modern' : 'Classic'}</span>`;
+
     return `
       <tr class="${isChecked ? 'row-selected' : ''}">
         <td style="text-align:center; width:44px;">
@@ -334,7 +343,10 @@ function renderTableView() {
           </div>
         </td>
         <td>
-          <div class="file-name" style="font-size:0.85rem">${escapeHtml(cert.job_title)}</div>
+          <div class="file-name" style="font-size:0.85rem">
+            ${escapeHtml(cert.job_title)}
+            ${templateBadge}
+          </div>
           <div class="file-sub">${escapeHtml(cert.job_organization)}</div>
         </td>
         <td>${statusBadge}</td>
@@ -403,6 +415,9 @@ function renderGridView() {
     const isChecked = state.selectedCertIds.has(cert.id);
     const isReady = cert.status === 'success';
 
+    const isModern = (cert.template || '').toLowerCase() === 'modern';
+    const templateBadge = `<span class="template-badge ${isModern ? 'template-badge-modern' : 'template-badge-classic'}">${isModern ? 'Modern' : 'Classic'}</span>`;
+
     return `
       <div class="cert-card ${isChecked ? 'card-selected' : ''}">
         <div class="cert-card-header">
@@ -414,7 +429,10 @@ function renderGridView() {
         </div>
         <div>
           <div class="cert-card-title">${escapeHtml(cert.recipient_name)}</div>
-          <div class="cert-card-course">${escapeHtml(cert.job_title)}</div>
+          <div class="cert-card-course" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span>${escapeHtml(cert.job_title)}</span>
+            ${templateBadge}
+          </div>
         </div>
         <div class="cert-card-meta">
           <span>${size} ${isS3 ? '<b style="color:#FB923C;">RustFS</b>' : ''}</span>
@@ -494,6 +512,91 @@ function downloadCurrentJobZip() {
   window.location.href = `/api/jobs/${state.selectedJobId}/download-zip/`;
 }
 
+function updateTemplateCardUI(val) {
+  if (elements.templateCardClassic) {
+    elements.templateCardClassic.classList.toggle('active', val === 'classic');
+  }
+  if (elements.templateCardModern) {
+    elements.templateCardModern.classList.toggle('active', val === 'modern');
+  }
+}
+
+async function loadSampleSignature(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state.currentSignatureData = e.target.result;
+      if (elements.signaturePreviewImg) elements.signaturePreviewImg.src = e.target.result;
+      if (elements.signaturePreviewBox) elements.signaturePreviewBox.style.display = 'inline-flex';
+      if (elements.btnClearSignature) elements.btnClearSignature.style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(blob);
+  } catch (err) {
+    console.error('Failed to load sample signature:', err);
+  }
+}
+
+function populateRecipientsFromList(recipients) {
+  elements.recipientsContainer.innerHTML = '';
+  recipients.forEach(r => addRecipientRow(r.name, r.email));
+  if (elements.fileUploadStatus) {
+    elements.fileUploadStatus.textContent = `Loaded ${recipients.length} recipients`;
+    elements.fileUploadStatus.style.display = 'block';
+    elements.fileUploadStatus.style.color = 'var(--emerald-success)';
+  }
+}
+
+async function loadSampleData(sampleNum) {
+  if (sampleNum === 1) {
+    document.getElementById('jobTitle').value = 'Full Stack Cloud & DevOps Engineering Bootcamp';
+    document.getElementById('jobOrg').value = 'Global Tech Academy';
+    document.getElementById('jobDate').value = '2026-10-15';
+
+    const classicRadio = document.querySelector('input[name="jobTemplate"][value="classic"]');
+    if (classicRadio) classicRadio.checked = true;
+    updateTemplateCardUI('classic');
+
+    const sample1 = [
+      { name: 'Alexander Wright', email: 'alexander.wright@techacademy.io' },
+      { name: 'Sophia Chen', email: 'sophia.chen@innovate.org' },
+      { name: 'Marcus Vance', email: 'marcus.vance@datasystems.com' },
+      { name: 'Elena Rostova', email: 'elena.rostova@cloudscale.net' },
+      { name: 'Liam O\'Connor', email: 'liam.oconnor@codeworks.dev' },
+      { name: 'Amina Al-Mansoor', email: 'amina.almansoor@globaledu.org' },
+      { name: 'David K. Miller', email: 'david.miller@academix.com' },
+      { name: 'Priya Sharma', email: 'priya.sharma@nextgenai.tech' },
+    ];
+    populateRecipientsFromList(sample1);
+    await loadSampleSignature('/static/samples/sample_signature_1.png');
+    showToast('Loaded Sample 1 (Bootcamp & Classic Gold Template)', 'info');
+  } else if (sampleNum === 2) {
+    document.getElementById('jobTitle').value = 'Advanced AI & Neural Systems Masterclass';
+    document.getElementById('jobOrg').value = 'Quantum Intelligence Institute';
+    document.getElementById('jobDate').value = '2026-10-20';
+
+    const modernRadio = document.querySelector('input[name="jobTemplate"][value="modern"]');
+    if (modernRadio) modernRadio.checked = true;
+    updateTemplateCardUI('modern');
+
+    const sample2 = [
+      { name: 'Jonathan Hayes', email: 'jonathan.hayes@quantumlabs.ai' },
+      { name: 'Dr. Beatrix Lestrange', email: 'beatrix.lestrange@research.org' },
+      { name: 'Carlos Santana Rodriguez', email: 'carlos.rodriguez@deepmind.io' },
+      { name: 'Aisha Patel', email: 'aisha.patel@machineintelligence.com' },
+      { name: 'Chloe Dupont', email: 'chloe.dupont@sorbonne-data.fr' },
+      { name: 'Kenji Takahashi', email: 'kenji.takahashi@tokyotech.ac.jp' },
+      { name: 'Michael Chang', email: 'michael.chang@ai-foundry.com' },
+      { name: 'Fatima Zahra', email: 'fatima.zahra@computational.org' },
+    ];
+    populateRecipientsFromList(sample2);
+    await loadSampleSignature('/static/samples/sample_signature_2.png');
+    showToast('Loaded Sample 2 (AI Masterclass & Modern Slate Template)', 'info');
+  }
+}
+
 // --- New Batch Modal Logic ---
 function openJobModal() {
   elements.jobModal.classList.add('active');
@@ -501,6 +604,9 @@ function openJobModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('jobDate').value = today;
   resetRecipients();
+  const classicRadio = document.querySelector('input[name="jobTemplate"][value="classic"]');
+  if (classicRadio) classicRadio.checked = true;
+  updateTemplateCardUI('classic');
   setTimeout(() => {
     const titleInput = document.getElementById('jobTitle');
     if (titleInput) titleInput.focus();
@@ -644,11 +750,13 @@ async function handleJobSubmit(e) {
   elements.btnSubmitJob.textContent = 'Queueing Batch...';
 
   try {
+    const selectedTemplate = document.querySelector('input[name="jobTemplate"]:checked')?.value || 'classic';
     const payload = {
       title,
       organization,
       date_of_issue,
       recipients,
+      template: selectedTemplate,
     };
     if (state.currentSignatureData) {
       payload.signature_data = state.currentSignatureData;
@@ -921,6 +1029,33 @@ function setupEventListeners() {
     elements.btnClearSignature.addEventListener('click', () => {
       clearSignature();
     });
+  }
+
+  // Template Card Selection
+  document.querySelectorAll('input[name="jobTemplate"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      updateTemplateCardUI(e.target.value);
+    });
+  });
+  if (elements.templateCardClassic) {
+    elements.templateCardClassic.addEventListener('click', () => {
+      const r = elements.templateCardClassic.querySelector('input[type="radio"]');
+      if (r) { r.checked = true; updateTemplateCardUI('classic'); }
+    });
+  }
+  if (elements.templateCardModern) {
+    elements.templateCardModern.addEventListener('click', () => {
+      const r = elements.templateCardModern.querySelector('input[type="radio"]');
+      if (r) { r.checked = true; updateTemplateCardUI('modern'); }
+    });
+  }
+
+  // Quick Load Sample Buttons
+  if (elements.btnLoadSample1) {
+    elements.btnLoadSample1.addEventListener('click', () => loadSampleData(1));
+  }
+  if (elements.btnLoadSample2) {
+    elements.btnLoadSample2.addEventListener('click', () => loadSampleData(2));
   }
 
   elements.jobForm.addEventListener('submit', handleJobSubmit);

@@ -58,6 +58,7 @@ class JobService:
             date_of_issue=request.date_of_issue,
             total_recipients=len(request.recipients),
             signature_data=request.signature_data,
+            template=getattr(request, "template", "classic") or "classic",
         )
 
         for recipient in request.recipients:
@@ -162,6 +163,7 @@ class JobService:
                 continue
 
             try:
+                template_name = getattr(job, "template", "classic") or "classic"
                 if is_s3:
                     storage_key = f"{job.id}/{cert.id}.pdf"
                     pdf_bytes = generate_certificate_bytes(
@@ -170,6 +172,7 @@ class JobService:
                         organization=job.organization,
                         date_of_issue=job.date_of_issue,
                         signature_image_bytes=signature_bytes,
+                        template=template_name,
                     )
                     stored_path = self.storage.upload(
                         key=storage_key,
@@ -185,6 +188,7 @@ class JobService:
                         date_of_issue=job.date_of_issue,
                         output_path=str(output_file),
                         signature_image_bytes=signature_bytes,
+                        template=template_name,
                     )
                     stored_path = str(output_file)
 
@@ -324,6 +328,11 @@ class JobService:
                     preview_url=f"/api/certificates/{cert.id}/preview/",
                     presigned_url=presigned_url,
                     storage_backend=backend_name,
+                    template=(
+                        cert.job.template
+                        if (cert.job and getattr(cert.job, "template", None))
+                        else "classic"
+                    ),
                 )
             )
 

@@ -65,6 +65,11 @@ class JobCreateRequest(BaseModel):
     signature_data: str | None = Field(
         None, description="Optional base64 encoded signature image (PNG/JPEG)"
     )
+    template: str = Field(
+        default="classic",
+        pattern=r"^(classic|modern)$",
+        description="Certificate template design ('classic' or 'modern')",
+    )
 
     @field_validator("title")
     @classmethod
@@ -127,6 +132,7 @@ class JobStatusResponse(BaseModel):
     failed_count: int
     created_at: datetime
     completed_at: datetime | None = None
+    template: str = "classic"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -158,6 +164,7 @@ class CertificateFileItemResponse(BaseModel):
     preview_url: str
     presigned_url: str | None = None
     storage_backend: str = "local"
+    template: str = "classic"
 
 
 class CertificateListResponse(BaseModel):

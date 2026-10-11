@@ -205,6 +205,43 @@
       </div>
       <form id="jobForm">
         <div class="modal-body">
+          <!-- Quick Load Sample Test Data -->
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:10px 14px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">Quick Load Sample Test Data</div>
+              <div style="font-size:0.72rem; color:var(--text-secondary);">Populate fields, recipients CSV, and signature with 1 click</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-secondary" id="btnLoadSample1" style="padding:4px 10px; font-size:0.75rem;">
+                Load Sample 1 (Bootcamp)
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnLoadSample2" style="padding:4px 10px; font-size:0.75rem;">
+                Load Sample 2 (AI Masterclass)
+              </button>
+            </div>
+          </div>
+
+          <!-- Template Design Selection -->
+          <div class="form-group" style="margin-bottom:16px;">
+            <label style="margin-bottom:6px;">Certificate Design Template *</label>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px;">
+              <label class="template-card active" id="templateCardClassic">
+                <input type="radio" name="jobTemplate" value="classic" checked style="margin-top:3px;">
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">Classic Gold Parchment</div>
+                  <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:2px;">Traditional gold borders, corner ornaments, warm ivory tone, and gold seal.</div>
+                </div>
+              </label>
+              <label class="template-card" id="templateCardModern">
+                <input type="radio" name="jobTemplate" value="modern" style="margin-top:3px;">
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text-primary);">Modern Slate &amp; Sky</div>
+                  <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:2px;">Clean contemporary layout, deep slate framing, electric sky accents, and verified shield.</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="jobTitle">Course / Event Title *</label>
             <input type="text" id="jobTitle" class="form-input" placeholder="e.g. Advanced Distributed Systems &amp; Cloud Architecture" required>
@@ -271,6 +308,6 @@
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <!-- Frontend Logic -->
-  <script src="/static/js/app.js?v=1.5"></script>
+  <script src="/static/js/app.js?v=1.6"></script>
 </body>
 </html>

@@ -29,10 +29,10 @@
   --emerald-success: #10B981;
   --rose-danger: #F43F5E;
   
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-sm: 0px;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
   
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -864,6 +864,54 @@ body {
   max-width: 120px;
   object-fit: contain;
   display: block;
+}
+
+/* --- Template Selection Cards --- */
+.template-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 180ms ease;
+  user-select: none;
+}
+
+.template-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.template-card.active {
+  border-color: var(--amber-primary);
+  background: rgba(245, 158, 11, 0.06);
+  box-shadow: 0 0 0 1px var(--amber-primary);
+}
+
+.template-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 6px;
+}
+
+.template-badge-classic {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.template-badge-modern {
+  background: rgba(2, 132, 199, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.25);
 }
 
 @media (max-width: 768px) {

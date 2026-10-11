@@ -48,3 +48,10 @@ def init_db() -> None:
             columns = [col["name"] for col in inspector.get_columns("jobs")]
             if "signature_data" not in columns:
                 conn.execute(text("ALTER TABLE jobs ADD COLUMN signature_data TEXT"))
+            if "template" not in columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE jobs ADD COLUMN template "
+                        "VARCHAR(50) DEFAULT 'classic'"
+                    )
+                )

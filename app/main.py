@@ -64,6 +64,10 @@ app.add_middleware(
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+SAMPLE_DIR = Path(__file__).resolve().parent.parent / "sample_data"
+if SAMPLE_DIR.is_dir():
+    app.mount("/samples", StaticFiles(directory=str(SAMPLE_DIR)), name="samples")
+
 # Mount API routers
 app.include_router(jobs_router)
 

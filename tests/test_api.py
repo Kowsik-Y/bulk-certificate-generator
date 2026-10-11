@@ -716,3 +716,40 @@ def test_s3_presigned_url_rewrite_docker_host() -> None:
     assert url is not None
     assert "http://localhost:9000" in url
     assert "rustfs:9000" not in url
+
+
+def test_create_job_with_modern_template(client: TestClient, db_session) -> None:
+    """Verify job creation with modern template and subsequent processing."""
+    from app.services.job_service import JobService
+
+    payload = {
+        "title": "Quantum Machine Learning",
+        "organization": "Quantum Labs AI",
+        "date_of_issue": "2026-10-20",
+        "template": "modern",
+        "recipients": [
+            {"name": "Elena Rostova", "email": "elena@example.com"},
+            {"name": "Liam O'Connor", "email": "liam@example.com"},
+        ],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    service = JobService(db=db_session)
+    job = service.process_job(job_id)
+    assert job.status == "completed"
+    assert job.template == "modern"
+    assert job.successful_count == 2
+
+    # Check status endpoint exposes template
+    status_resp = client.get(f"/api/jobs/{job_id}/")
+    assert status_resp.status_code == 200
+    assert status_resp.json()["template"] == "modern"
+
+    # Check certificates listing endpoint exposes template
+    list_resp = client.get(f"/api/certificates/?job_id={job_id}")
+    assert list_resp.status_code == 200
+    items = list_resp.json()["items"]
+    assert len(items) == 2
+    assert all(item["template"] == "modern" for item in items)

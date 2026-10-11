@@ -134,3 +134,42 @@ class JobCreateResponse(BaseModel):
     job_id: str
     status: str
     message: str
+
+
+class CertificateFileItemResponse(BaseModel):
+    """Schema for certificate files displayed in the file manager."""
+
+    id: str
+    job_id: str
+    job_title: str
+    job_organization: str
+    recipient_name: str
+    recipient_email: str | None = None
+    status: str
+    file_size_bytes: int | None = None
+    file_size_formatted: str | None = None
+    error_message: str | None = None
+    file_exists: bool = False
+    created_at: datetime
+    download_url: str
+    preview_url: str
+
+
+class CertificateListResponse(BaseModel):
+    """Paginated list of certificate files."""
+
+    total: int
+    skip: int
+    limit: int
+    items: list[CertificateFileItemResponse]
+
+
+class SystemStatsResponse(BaseModel):
+    """System-wide file storage and job metrics."""
+
+    total_jobs: int
+    total_certificates: int
+    successful_certificates: int
+    failed_certificates: int
+    total_storage_bytes: int
+    total_storage_formatted: str

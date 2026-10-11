@@ -1,4 +1,4 @@
-"""FastAPI application initialization and lifespan management."""
+"""FastAPI application initialization, static assets, and lifespan management."""
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,12 +6,16 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
 from app.routers.jobs import router as jobs_router
 
 settings = get_settings()
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -30,8 +34,8 @@ app = FastAPI(
     title=settings.app_title,
     version=settings.app_version,
     description=(
-        "Production-ready backend API for bulk certificate generation "
-        "using Celery, Redis, ReportLab, and SQLite/PostgreSQL."
+        "Production-ready backend API for bulk certificate generation and file "
+        "management using Celery, Redis, ReportLab, and SQLite/PostgreSQL."
     ),
     lifespan=lifespan,
     docs_url="/docs",
@@ -47,8 +51,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static assets for frontend dashboard & file manager
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 # Mount API routers
 app.include_router(jobs_router)
+
+
+@app.get("/", tags=["UI Dashboard"], summary="Certificate File Manager Dashboard")
+@app.get(
+    "/manager", tags=["UI Dashboard"], summary="Certificate File Manager Dashboard"
+)
+def serve_dashboard():
+    """Serve the Certificate File Manager web user interface."""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.is_file():
+        return FileResponse(str(index_file), media_type="text/html")
+    return {
+        "message": "Welcome to Bulk Certificate Generator API",
+        "documentation": "/docs",
+        "health": "/health",
+    }
 
 
 @app.get("/health", tags=["System"])
@@ -61,11 +85,12 @@ def health_check() -> dict[str, str]:
     }
 
 
-@app.get("/", tags=["System"])
-def root() -> dict[str, str]:
-    """Root endpoint providing links to API documentation."""
+@app.get("/api/info", tags=["System"])
+def api_info() -> dict[str, str]:
+    """System information endpoint."""
     return {
-        "message": "Welcome to Bulk Certificate Generator API",
+        "message": "Bulk Certificate Generator API",
         "documentation": "/docs",
         "health": "/health",
+        "dashboard": "/",
     }

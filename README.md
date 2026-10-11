@@ -236,6 +236,66 @@ Downloads `certificate_Alice_Johnson.pdf` directly.
 
 ---
 
+### 5. Preview Certificate Inline
+
+`GET /api/certificates/{certificate_id}/preview/` — **Status: 200 OK**
+
+Streams the PDF inline (`Content-Disposition: inline`) for browser embedding or modal viewer.
+
+---
+
+### 6. Batch Download Job as ZIP
+
+`GET /api/jobs/{job_id}/download-zip/` — **Status: 200 OK**
+
+```bash
+curl -OJ http://localhost:8000/api/jobs/{job_id}/download-zip/
+```
+
+Packages all successfully generated certificates in the job into a sanitized ZIP archive (`certificates_job_{job_id}.zip`).
+
+---
+
+### 7. File Manager Search & Filter Query
+
+`GET /api/certificates/?search=Alice&status=success&skip=0&limit=50` — **Status: 200 OK**
+
+Returns paginated certificates with file sizes, creation timestamps, and download links.
+
+---
+
+### 8. Delete Certificate
+
+`DELETE /api/certificates/{certificate_id}/` — **Status: 200 OK**
+
+Safely removes the certificate from the database and physically deletes the PDF file from disk, while adjusting parent job metrics.
+
+---
+
+### 9. System Storage & Metrics
+
+`GET /api/stats/` — **Status: 200 OK**
+
+Returns aggregated storage metrics (`total_jobs`, `total_certificates`, `successful_certificates`, `failed_certificates`, `total_storage_bytes`, `total_storage_formatted`).
+
+---
+
+## 🖥️ Certificate File Manager Web Dashboard
+
+An interactive dashboard is served directly at:
+- **`http://localhost:8000/`** or **`http://localhost:8000/manager`**
+
+### Features:
+- 📊 **Real-time Storage Overview**: Live disk usage, total jobs, and success/failure tallies.
+- 🔍 **Live Search & Filter**: Filter by recipient name, email, or status (`all`, `success`, `pending`, `failed`).
+- 👁️ **In-Browser PDF Modal Preview**: Instant visual preview modal without leaving the dashboard.
+- 📦 **One-Click Batch ZIP Download**: Export entire batches with clean file naming.
+- 🗑️ **Safe File Deletion**: Delete individual certificates with physical storage cleanup.
+- 🚀 **Built-in Batch Dispatcher**: Launch new certificate generation batches directly from a modern modal dialog.
+- 🌓 **Rich Dark Aesthetics**: Glassmorphism UI built with Vanilla CSS and Vanilla JS (zero frontend build step needed).
+
+---
+
 ## Testing & Quality
 
 Tests run in-memory with Celery in **eager mode** (`task_always_eager=True`), meaning no running Redis or Celery worker process is needed to execute the test suite!

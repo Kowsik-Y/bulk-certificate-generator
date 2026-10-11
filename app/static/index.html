@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bulk Certificate Manager — High Performance Dashboard</title>
+  <meta name="description" content="Manage, preview, search, and download generated PDF certificates in bulk with Celery and FastAPI.">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="navbar" id="mainNavbar">
+      <a href="/" class="brand" id="brandLogo">
+        <div class="brand-icon">🎓</div>
+        <div class="brand-text">
+          <h1>CertManager</h1>
+          <p>Bulk Certificate Generator & File Hub</p>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <a href="/docs" target="_blank" class="btn btn-secondary" id="btnApiDocs" title="Open Swagger OpenAPI Documentation">
+          📖 API Docs
+        </a>
+        <button class="btn btn-primary" id="btnNewBatch">
+          ✨ Generate New Batch
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Stats Grid -->
+    <section class="stats-grid" id="statsGrid" aria-label="System Metrics">
+      <div class="stat-card" id="cardTotalCerts">
+        <div class="stat-icon certs">📜</div>
+        <div class="stat-content">
+          <div class="stat-label">Certificates</div>
+          <div class="stat-value" id="statTotalCerts">0</div>
+        </div>
+      </div>
+      <div class="stat-card" id="cardTotalJobs">
+        <div class="stat-icon jobs">⚡</div>
+        <div class="stat-content">
+          <div class="stat-label">Total Batches</div>
+          <div class="stat-value" id="statTotalJobs">0</div>
+        </div>
+      </div>
+      <div class="stat-card" id="cardSuccessRate">
+        <div class="stat-icon success">🎯</div>
+        <div class="stat-content">
+          <div class="stat-label">Success Rate</div>
+          <div class="stat-value" id="statSuccessRate">100%</div>
+        </div>
+      </div>
+      <div class="stat-card" id="cardStorageUsed">
+        <div class="stat-icon storage">💾</div>
+        <div class="stat-content">
+          <div class="stat-label">Storage Used</div>
+          <div class="stat-value" id="statStorageUsed">0.0 KB</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Certificate File Manager Section -->
+    <main class="manager-card" id="managerCard">
+      <!-- Toolbar -->
+      <div class="manager-toolbar" id="managerToolbar">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search by recipient or email..." autocomplete="off">
+          </div>
+          
+          <select class="select-filter" id="jobFilterSelect" aria-label="Filter by Job">
+            <option value="">All Jobs / Batches</option>
+          </select>
+
+          <div class="filter-pills" id="statusFilterPills">
+            <button class="filter-pill active" data-status="">All</button>
+            <button class="filter-pill" data-status="success">Ready</button>
+            <button class="filter-pill" data-status="failed">Failed</button>
+            <button class="filter-pill" data-status="pending">Queued</button>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <button class="btn btn-secondary" id="btnDownloadZip" style="display:none;" title="Download all ready certificates in this batch as a ZIP">
+            📦 Download Batch ZIP
+          </button>
+          <button class="btn btn-secondary btn-icon" id="btnRefresh" title="Refresh files and metrics">
+            🔄
+          </button>
+          <div class="view-toggle">
+            <button class="toggle-btn active" id="btnViewTable" title="Table View">☰</button>
+            <button class="toggle-btn" id="btnViewGrid" title="Card Grid View">⊞</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Manager Items Container -->
+      <div id="filesContainer">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </main>
+
+  </div>
+
+  <!-- PDF Preview Modal -->
+  <div class="modal-overlay" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+    <div class="modal-box preview-box">
+      <div class="modal-header">
+        <h3 id="previewTitle">Certificate Preview</h3>
+        <button class="btn-icon" id="btnClosePreview" aria-label="Close Preview Modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding:12px; background:#0B0F19">
+        <iframe class="pdf-preview-frame" id="previewIframe" src="about:blank" title="Certificate PDF Viewer"></iframe>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-primary" id="btnPreviewDownload" download>
+          ⬇️ Download PDF
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Batch Generation Modal -->
+  <div class="modal-overlay" id="jobModal" role="dialog" aria-modal="true" aria-labelledby="jobModalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="jobModalTitle">Create Bulk Certificate Generation Job</h3>
+        <button class="btn-icon" id="btnCloseJobModal" aria-label="Close Job Modal">✕</button>
+      </div>
+      <form id="jobForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="jobTitle">Course / Event Title *</label>
+            <input type="text" id="jobTitle" class="form-input" placeholder="e.g. Advanced Distributed Systems & Cloud Architecture" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="jobOrg">Issuing Organization *</label>
+              <input type="text" id="jobOrg" class="form-input" placeholder="e.g. Software Engineering Academy" required>
+            </div>
+            <div class="form-group">
+              <label for="jobDate">Date of Issue (YYYY-MM-DD) *</label>
+              <input type="date" id="jobDate" class="form-input" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:20px;">
+            <div class="recipients-header">
+              <label style="margin-bottom:0">Recipients List *</label>
+              <button type="button" class="btn btn-secondary" id="btnAddRecipient" style="padding:4px 10px; font-size:0.75rem">
+                + Add Recipient
+              </button>
+            </div>
+            <div id="recipientsContainer">
+              <!-- Dynamically populated rows -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelJobModal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSubmitJob">Generate Certificates</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Frontend Logic -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

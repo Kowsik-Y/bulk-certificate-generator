@@ -38,5 +38,13 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables and apply missing column migrations."""
+    from sqlalchemy import inspect, text
+
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        if "jobs" in inspector.get_table_names():
+            columns = [col["name"] for col in inspector.get_columns("jobs")]
+            if "signature_data" not in columns:
+                conn.execute(text("ALTER TABLE jobs ADD COLUMN signature_data TEXT"))

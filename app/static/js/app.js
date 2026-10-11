@@ -363,10 +363,15 @@ function openJobModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('jobDate').value = today;
   resetRecipients();
+  setTimeout(() => {
+    const titleInput = document.getElementById('jobTitle');
+    if (titleInput) titleInput.focus();
+  }, 60);
 }
 
 function closeJobModal() {
   elements.jobModal.classList.remove('active');
+  if (elements.btnNewBatch) elements.btnNewBatch.focus();
 }
 
 function resetRecipients() {
@@ -528,6 +533,17 @@ function setupEventListeners() {
   elements.btnClosePreview.addEventListener('click', closePreview);
   elements.previewModal.addEventListener('click', (e) => {
     if (e.target === elements.previewModal) closePreview();
+  });
+  elements.jobModal.addEventListener('click', (e) => {
+    if (e.target === elements.jobModal) closeJobModal();
+  });
+
+  // Keyboard accessibility: Escape closes any active modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (elements.previewModal.classList.contains('active')) closePreview();
+      if (elements.jobModal.classList.contains('active')) closeJobModal();
+    }
   });
 }
 

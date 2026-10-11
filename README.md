@@ -284,18 +284,18 @@ Returns aggregated storage metrics (`total_jobs`, `total_certificates`, `success
 
 ---
 
-## 🖥️ Certificate File Manager Web Dashboard
+## Certificate File Manager Web Dashboard
 
 An interactive dashboard is served directly at:
 - **`http://localhost:8000/`** or **`http://localhost:8000/manager`**
 
 ### Features:
-- 📊 **Real-time Storage Overview**: Live disk usage, total jobs, and success/failure tallies.
-- 🔍 **Live Search & Filter**: Filter by recipient name, email, or status (`all`, `success`, `pending`, `failed`).
-- 👁️ **In-Browser PDF Modal Preview**: Instant visual preview modal without leaving the dashboard.
-- 📦 **One-Click Batch ZIP Download**: Export entire batches with clean file naming.
-- 🗑️ **Safe File Deletion**: Delete individual certificates with physical storage cleanup.
-- 🚀 **Built-in Batch Dispatcher**: Launch new certificate generation batches directly from a modern modal dialog.
+- **Real-time Storage Overview**: Live disk usage, total jobs, and success/failure tallies.
+- **Live Search & Filter**: Filter by recipient name, email, or status (`all`, `success`, `pending`, `failed`).
+- **In-Browser PDF Modal Preview**: Instant visual preview modal without leaving the dashboard.
+- **One-Click Batch ZIP Download**: Export entire batches with clean file naming.
+- **Safe File Deletion**: Delete individual certificates with physical storage cleanup.
+- **Built-in Batch Dispatcher**: Launch new certificate generation batches directly from a modern modal dialog.
 - **Rich Dark Aesthetics**: Glassmorphism UI built with Vanilla CSS and Vanilla JS (zero frontend build step needed).
 
 ---

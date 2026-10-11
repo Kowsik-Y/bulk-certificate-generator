@@ -38,7 +38,10 @@ const elements = {
   batchInfoBar: document.getElementById('batchInfoBar'),
   btnDownloadSelectedZip: document.getElementById('btnDownloadSelectedZip'),
   btnDownloadSelectedText: document.getElementById('btnDownloadSelectedText'),
+  btnDeleteSelected: document.getElementById('btnDeleteSelected'),
+  btnDeleteSelectedText: document.getElementById('btnDeleteSelectedText'),
   btnRefresh: document.getElementById('btnRefresh'),
+
   btnNewBatch: document.getElementById('btnNewBatch'),
   btnViewTable: document.getElementById('btnViewTable'),
   btnViewGrid: document.getElementById('btnViewGrid'),
@@ -266,10 +269,20 @@ function updateSelectionUI() {
     }
   }
 
+  if (elements.btnDeleteSelected) {
+    if (count > 0) {
+      elements.btnDeleteSelected.style.display = 'inline-flex';
+      if (elements.btnDeleteSelectedText) {
+        elements.btnDeleteSelectedText.textContent = `Delete Selected (${count})`;
+      }
+    } else {
+      elements.btnDeleteSelected.style.display = 'none';
+    }
+  }
+
   const selectAll = document.getElementById('selectAllCheckbox');
   if (selectAll) {
-    const readyCerts = state.certificates.filter(c => c.status === 'success');
-    selectAll.checked = readyCerts.length > 0 && readyCerts.every(c => state.selectedCertIds.has(c.id));
+    selectAll.checked = state.certificates.length > 0 && state.certificates.every(c => state.selectedCertIds.has(c.id));
   }
 }
 
@@ -319,6 +332,55 @@ async function downloadSelectedZip() {
   }
 }
 
+async function deleteSelectedCertificates() {
+  const ids = Array.from(state.selectedCertIds);
+  if (ids.length === 0) {
+    showToast('Please select at least one certificate to delete', 'info');
+    return;
+  }
+
+  const confirmMsg = `Are you sure you want to permanently delete the ${ids.length} selected certificate(s)? All generated files will be removed.`;
+  if (!window.confirm(confirmMsg)) {
+    return;
+  }
+
+  if (elements.btnDeleteSelected) {
+    elements.btnDeleteSelected.disabled = true;
+  }
+  if (elements.btnDeleteSelectedText) {
+    elements.btnDeleteSelectedText.textContent = 'Deleting...';
+  }
+
+  try {
+    const res = await fetch('/api/certificates/bulk-delete/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ certificate_ids: ids }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Bulk deletion failed');
+    }
+
+    const data = await res.json();
+    showToast(data.message || `Successfully deleted ${data.deleted_count} certificate(s)`, 'success');
+    state.selectedCertIds.clear();
+    updateSelectionUI();
+    await fetchCertificates();
+    await fetchStats();
+    await fetchJobs();
+  } catch (err) {
+    showToast(`Error deleting certificates: ${err.message}`, 'error');
+  } finally {
+    if (elements.btnDeleteSelected) {
+      elements.btnDeleteSelected.disabled = false;
+    }
+    updateSelectionUI();
+  }
+}
+
+
 function renderTableView() {
   const rows = state.certificates.map(cert => {
     const statusBadge = getStatusBadge(cert.status);
@@ -334,7 +396,7 @@ function renderTableView() {
     return `
       <tr class="${isChecked ? 'row-selected' : ''}">
         <td style="text-align:center; width:44px;">
-          <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} ${!isReady ? 'disabled' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
+          <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
         </td>
         <td>
           <div class="file-info">
@@ -425,7 +487,7 @@ function renderGridView() {
       <div class="cert-card ${isChecked ? 'card-selected' : ''}">
         <div class="cert-card-header">
           <div style="display:flex; align-items:center; gap:10px;">
-            <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} ${!isReady ? 'disabled' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
+            <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
             <div class="file-icon" style="width:36px; height:36px; font-size:12px; ${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
           </div>
           ${statusBadge}
@@ -1120,17 +1182,18 @@ function setupEventListeners() {
   if (elements.btnDownloadSelectedZip) {
     elements.btnDownloadSelectedZip.addEventListener('click', downloadSelectedZip);
   }
-
+  if (elements.btnDeleteSelected) {
+    elements.btnDeleteSelected.addEventListener('click', deleteSelectedCertificates);
+  }
 
   // Delegation for table/grid selection checkboxes
   elements.filesContainer.addEventListener('change', (e) => {
     if (e.target && e.target.id === 'selectAllCheckbox') {
       const checked = e.target.checked;
-      const readyCerts = state.certificates.filter(c => c.status === 'success');
       if (checked) {
-        readyCerts.forEach(c => state.selectedCertIds.add(c.id));
+        state.certificates.forEach(c => state.selectedCertIds.add(c.id));
       } else {
-        readyCerts.forEach(c => state.selectedCertIds.delete(c.id));
+        state.certificates.forEach(c => state.selectedCertIds.delete(c.id));
       }
       renderCertificates();
     } else if (e.target && e.target.classList.contains('cert-select-checkbox')) {

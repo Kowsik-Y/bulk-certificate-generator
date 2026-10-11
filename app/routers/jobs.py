@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.schemas import (
+    BulkDeleteCertificatesRequest,
+    BulkDeleteCertificatesResponse,
     CertificateListResponse,
     CertificateResponse,
     DownloadSelectedZipRequest,
@@ -527,6 +529,28 @@ def download_selected_certificates_zip(
         path=str(zip_path),
         media_type="application/zip",
         filename=zip_filename,
+    )
+
+
+@router.post(
+    "/api/certificates/bulk-delete/",
+    response_model=BulkDeleteCertificatesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Bulk delete selected certificates",
+    description="Deletes multiple certificates and removes their files from storage.",
+)
+def bulk_delete_certificates(
+    payload: BulkDeleteCertificatesRequest,
+    db: Session = Depends(get_db),
+) -> BulkDeleteCertificatesResponse:
+    """Delete multiple certificates and adjust parent job statistics."""
+    service = JobService(db)
+    result = service.delete_certificates(payload.certificate_ids)
+    return BulkDeleteCertificatesResponse(
+        status=result["status"],
+        message=result["message"],
+        deleted_count=result["deleted_count"],
+        deleted_ids=result["deleted_ids"],
     )
 
 

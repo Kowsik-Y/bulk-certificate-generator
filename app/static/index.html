@@ -153,7 +153,17 @@
             </svg>
             <span id="btnDownloadSelectedText">Download Selected (0) ZIP</span>
           </button>
+          <button class="btn btn-danger" id="btnDeleteSelected" style="display:none;" title="Bulk delete selected certificates">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            <span id="btnDeleteSelectedText">Delete Selected (0)</span>
+          </button>
           <button class="btn btn-secondary" id="btnDownloadZip" style="display:none;" title="Download all ready certificates in this batch as a ZIP">
+
             Download Batch ZIP
           </button>
           <button class="btn btn-danger" id="btnDeleteBatch" style="display:none;" title="Delete this selected batch and all its certificates">
@@ -326,7 +336,8 @@
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <!-- Frontend Logic -->
-  <script src="/static/js/app.js?v=1.8"></script>
+  <script src="/static/js/app.js?v=1.9"></script>
 </body>
+
 </html>
 

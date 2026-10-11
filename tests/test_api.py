@@ -834,3 +834,52 @@ def test_delete_empty_jobs(client: TestClient, db_session) -> None:
     assert client.get(f"/api/jobs/{empty_job_id}/").status_code == 404
     # Ensure non-empty job remains
     assert client.get(f"/api/jobs/{keep_job_id}/").status_code == 200
+
+
+def test_bulk_delete_certificates(client: TestClient, db_session) -> None:
+    """Test bulk deleting multiple selected certificates."""
+    payload = {
+        "title": "Bulk Delete Test Batch",
+        "organization": "Test Org",
+        "date_of_issue": "2026-10-20",
+        "recipients": [
+            {"name": "Bulk Delete 1", "email": "del1@example.com"},
+            {"name": "Bulk Delete 2", "email": "del2@example.com"},
+            {"name": "Bulk Delete 3", "email": "del3@example.com"},
+        ],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    certs_resp = client.get(f"/api/certificates/?job_id={job_id}")
+    assert certs_resp.status_code == 200
+    items = certs_resp.json()["items"]
+    assert len(items) == 3
+
+    id1, id2, id3 = items[0]["id"], items[1]["id"], items[2]["id"]
+
+    # Delete 2 valid certificates + 1 non-existent ID
+    nonexistent_id = "00000000-0000-0000-0000-000000000000"
+    bulk_del_resp = client.post(
+        "/api/certificates/bulk-delete/",
+        json={"certificate_ids": [id1, id2, nonexistent_id]},
+    )
+    assert bulk_del_resp.status_code == 200
+    data = bulk_del_resp.json()
+    assert data["status"] == "success"
+    assert data["deleted_count"] == 2
+    assert id1 in data["deleted_ids"]
+    assert id2 in data["deleted_ids"]
+
+    # Verify id1 and id2 are removed, id3 remains
+    certs_remaining = client.get(f"/api/certificates/?job_id={job_id}").json()["items"]
+    assert len(certs_remaining) == 1
+    assert certs_remaining[0]["id"] == id3
+
+    # Calling bulk delete with empty list should fail validation (422)
+    invalid_resp = client.post(
+        "/api/certificates/bulk-delete/",
+        json={"certificate_ids": []},
+    )
+    assert invalid_resp.status_code == 422

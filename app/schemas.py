@@ -201,3 +201,18 @@ class DownloadSelectedZipRequest(BaseModel):
     """Schema for requesting a zip archive of selected certificate IDs."""
 
     certificate_ids: list[str] = Field(..., min_length=1, max_length=1000)
+
+
+class BulkDeleteCertificatesRequest(BaseModel):
+    """Schema for requesting bulk deletion of selected certificate IDs."""
+
+    certificate_ids: list[str] = Field(..., min_length=1, max_length=1000)
+
+
+class BulkDeleteCertificatesResponse(BaseModel):
+    """Response schema for bulk deletion of certificates."""
+
+    status: str
+    message: str
+    deleted_count: int
+    deleted_ids: list[str]

@@ -403,6 +403,36 @@ class JobService:
         self.db.commit()
         return True
 
+    def delete_certificates(self, cert_ids: list[str]) -> dict[str, Any]:
+        """Delete multiple certificates, remove files, and adjust job stats."""
+        deleted_ids: list[str] = []
+        for cert_id in cert_ids:
+            cert = self.repo.get_certificate_by_id(cert_id)
+            if not cert:
+                continue
+
+            if cert.file_path:
+                self.storage.delete(cert.file_path)
+
+            if cert.job:
+                if cert.status == "success" and cert.job.successful_count > 0:
+                    cert.job.successful_count -= 1
+                elif cert.status == "failed" and cert.job.failed_count > 0:
+                    cert.job.failed_count -= 1
+                if cert.job.total_recipients > 0:
+                    cert.job.total_recipients -= 1
+
+            self.repo.delete_certificate(cert)
+            deleted_ids.append(cert.id)
+
+        self.db.commit()
+        return {
+            "status": "success",
+            "message": f"Successfully deleted {len(deleted_ids)} certificate(s)",
+            "deleted_count": len(deleted_ids),
+            "deleted_ids": deleted_ids,
+        }
+
     def delete_job(self, job_id: str) -> bool:
         """Delete a job, remove all its stored PDF files, and delete DB records."""
         job = self.repo.get_job_by_id(job_id)

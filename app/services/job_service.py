@@ -115,10 +115,16 @@ class JobService:
         publish_job_event(
             self.settings.redis_url,
             {
+                "event": "job_started",
                 "type": "job_started",
                 "job_id": job.id,
                 "title": job.title,
+                "total": job.total_recipients,
                 "total_recipients": job.total_recipients,
+                "processed": 0,
+                "current": 0,
+                "percent": 0,
+                "percentage": 0,
             },
         )
 
@@ -202,18 +208,22 @@ class JobService:
             self.db.commit()
 
             # Broadcast progress
+            pct = round((idx / total_certs) * 100) if total_certs else 100
             publish_job_event(
                 self.settings.redis_url,
                 {
+                    "event": "job_progress",
                     "type": "job_progress",
                     "job_id": job.id,
                     "title": job.title,
                     "recipient_name": cert.recipient_name,
+                    "current_recipient": cert.recipient_name,
+                    "processed": idx,
                     "current": idx,
                     "total": total_certs,
-                    "percentage": (
-                        round((idx / total_certs) * 100) if total_certs else 100
-                    ),
+                    "total_recipients": total_certs,
+                    "percent": pct,
+                    "percentage": pct,
                     "cert_status": cert.status,
                 },
             )
@@ -234,10 +244,15 @@ class JobService:
         publish_job_event(
             self.settings.redis_url,
             {
+                "event": "job_completed",
                 "type": "job_completed",
                 "job_id": job.id,
                 "title": job.title,
                 "status": final_status,
+                "total": total_certs,
+                "processed": total_certs,
+                "percent": 100,
+                "percentage": 100,
                 "successful_count": success_count,
                 "failed_count": fail_count,
             },

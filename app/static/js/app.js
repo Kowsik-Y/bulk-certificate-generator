@@ -147,14 +147,28 @@ async function fetchJobs() {
     elements.jobFilterSelect.value = currentVal;
     
     // Check if any job is still pending/processing
-    const hasActiveJobs = state.jobs.some(j => j.status === 'pending' || j.status === 'processing');
-    if (hasActiveJobs && !state.pollTimer) {
+    const activeJob = state.jobs.find(j => j.status === 'pending' || j.status === 'processing');
+    if (activeJob && elements.liveJobBanner) {
+      elements.liveJobBanner.style.display = 'block';
+      if (elements.liveJobTitle) elements.liveJobTitle.textContent = activeJob.title;
+      const done = (activeJob.successful_count || 0) + (activeJob.failed_count || 0);
+      const total = activeJob.total_recipients || 0;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      if (elements.liveJobProgressText) elements.liveJobProgressText.textContent = `${done} / ${total}`;
+      if (elements.liveJobPercent) elements.liveJobPercent.textContent = `${pct}%`;
+      if (elements.liveProgressBar) elements.liveProgressBar.style.width = `${pct}%`;
+      if (elements.liveJobRecipient) {
+        elements.liveJobRecipient.textContent = activeJob.status === 'processing' ? 'Processing in worker...' : 'Queued...';
+      }
+    }
+
+    if (activeJob && !state.pollTimer) {
       state.pollTimer = setInterval(() => {
         fetchCertificates(false);
         fetchStats();
         fetchJobs();
-      }, 3000);
-    } else if (!hasActiveJobs && state.pollTimer) {
+      }, 2500);
+    } else if (!activeJob && state.pollTimer) {
       clearInterval(state.pollTimer);
       state.pollTimer = null;
     }
@@ -654,6 +668,16 @@ async function handleJobSubmit(e) {
     const data = await res.json();
     showToast(`Job queued! ${recipients.length} certificates generating in background.`, 'success');
     closeJobModal();
+
+    // Immediately show live batch generation widget
+    if (elements.liveJobBanner) {
+      elements.liveJobBanner.style.display = 'block';
+      if (elements.liveJobTitle) elements.liveJobTitle.textContent = title || `Job ${data.job_id.slice(0, 8)}`;
+      if (elements.liveJobProgressText) elements.liveJobProgressText.textContent = `0 / ${recipients.length}`;
+      if (elements.liveJobPercent) elements.liveJobPercent.textContent = `0%`;
+      if (elements.liveProgressBar) elements.liveProgressBar.style.width = `0%`;
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = 'Queued in background worker...';
+    }
     
     // Select newly submitted job
     state.selectedJobId = data.job_id;
@@ -681,19 +705,26 @@ function debounceRefresh() {
 }
 
 function handleLiveJobEvent(event) {
-  if (!event || !event.event) return;
+  if (!event) return;
+  const evtType = event.event || event.type;
+  if (!evtType) return;
 
-  const { event: evtType, job_id, title, total, processed, percent, current_recipient } = event;
+  const job_id = event.job_id;
+  const title = event.title;
+  const total = event.total != null ? event.total : (event.total_recipients != null ? event.total_recipients : 0);
+  const processed = event.processed != null ? event.processed : (event.current != null ? event.current : 0);
+  const percent = event.percent != null ? event.percent : (event.percentage != null ? event.percentage : 0);
+  const current_recipient = event.current_recipient || event.recipient_name || '';
 
   if (evtType === 'job_started' || evtType === 'job_progress') {
     if (elements.liveJobBanner) {
       elements.liveJobBanner.style.display = 'block';
       if (elements.liveJobTitle) elements.liveJobTitle.textContent = title || `Job ${job_id ? job_id.slice(0, 8) : ''}`;
-      if (elements.liveJobProgressText) elements.liveJobProgressText.textContent = `${processed || 0} / ${total || 0}`;
+      if (elements.liveJobProgressText) elements.liveJobProgressText.textContent = `${processed} / ${total}`;
       const pct = percent != null ? percent : (total > 0 ? Math.round((processed / total) * 100) : 0);
       if (elements.liveJobPercent) elements.liveJobPercent.textContent = `${pct}%`;
       if (elements.liveProgressBar) elements.liveProgressBar.style.width = `${pct}%`;
-      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = current_recipient || 'Processing...';
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = current_recipient ? `Recipient: ${current_recipient}` : 'Generating certificates...';
     }
 
     if (!state.selectedJobId || state.selectedJobId === job_id) {
@@ -703,10 +734,10 @@ function handleLiveJobEvent(event) {
     if (elements.liveJobBanner) {
       if (elements.liveJobPercent) elements.liveJobPercent.textContent = '100%';
       if (elements.liveProgressBar) elements.liveProgressBar.style.width = '100%';
-      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = 'Batch Completed';
+      if (elements.liveJobRecipient) elements.liveJobRecipient.textContent = 'Batch Completed Successfully';
       setTimeout(() => {
         if (elements.liveJobBanner) elements.liveJobBanner.style.display = 'none';
-      }, 3500);
+      }, 4000);
     }
     showToast(`Batch completed: ${title || (job_id ? job_id.slice(0, 8) : '')} (${total || 0} certificates ready)`, 'success');
     fetchStats();

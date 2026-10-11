@@ -208,6 +208,9 @@ class S3StorageBackend(StorageBackend):
                 Params={"Bucket": self.bucket_name, "Key": clean_key},
                 ExpiresIn=expires_in,
             )
+            # Rewrite Docker internal hostname to localhost for browser clients
+            if "://rustfs:9000" in url:
+                url = url.replace("://rustfs:9000", "://localhost:9000")
             return url
         except ClientError as e:
             logger.warning("S3 generate_presigned_url error: %s", e)

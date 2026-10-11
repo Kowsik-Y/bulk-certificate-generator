@@ -449,6 +449,23 @@ body {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.files-table tr.row-selected td {
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.cert-card.card-selected {
+  border-color: var(--gold-primary);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.cert-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold-primary);
+  cursor: pointer;
+}
+
+
 .file-info {
   display: flex;
   align-items: center;

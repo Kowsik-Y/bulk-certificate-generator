@@ -140,7 +140,7 @@ def _render_certificate_content(
     # Date column on left
     c.setFont("Helvetica", 11)
     c.setFillColor(HexColor("#555555"))
-    c.drawCentredString(width * 0.28, footer_y + 24, f"Date: {date_of_issue}")
+    c.drawCentredString(width * 0.28, footer_y + 24, f"{date_of_issue}")
     c.setStrokeColor(HexColor("#888888"))
     c.setLineWidth(0.8)
     c.line(width * 0.28 - 70, footer_y + 12, width * 0.28 + 70, footer_y + 12)

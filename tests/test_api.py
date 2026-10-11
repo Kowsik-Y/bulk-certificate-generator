@@ -630,3 +630,89 @@ def test_websocket_endpoint_connect_and_broadcast(client: TestClient) -> None:
         assert msg["event"] == "job_progress"
         assert msg["job_id"] == "test-ws-id"
         assert msg["percent"] == 50
+
+
+def test_download_selected_certificates_zip(
+    client: TestClient, db_session, monkeypatch
+) -> None:
+    """Verify group downloading of selected certificates as a single ZIP."""
+    import io
+    import zipfile
+    from unittest.mock import MagicMock
+
+    from app.services.job_service import JobService
+
+    mock_delay = MagicMock()
+    mock_delay.return_value.id = "mock-zip-task-id"
+    monkeypatch.setattr("app.tasks.process_job_task.delay", mock_delay)
+
+    resp = client.post(
+        "/api/jobs/",
+        json={
+            "title": "Selected ZIP Test",
+            "organization": "Batch Dept",
+            "date_of_issue": "2026-10-15",
+            "recipients": [
+                {"name": "Alice Winner", "email": "alice@example.com"},
+                {"name": "Bob Champion", "email": "bob@example.com"},
+            ],
+        },
+    )
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    service = JobService(db=db_session)
+    service.process_job(job_id)
+
+    certs = service.get_certificates(job_id)
+    cert_ids = [c.id for c in certs]
+    assert len(cert_ids) == 2
+
+    # Request ZIP of selected certificates
+    zip_resp = client.post(
+        "/api/certificates/download-selected-zip/",
+        json={"certificate_ids": cert_ids},
+    )
+    assert zip_resp.status_code == 200
+    assert zip_resp.headers["content-type"] == "application/zip"
+
+    # Verify zip content
+    with zipfile.ZipFile(io.BytesIO(zip_resp.content)) as zf:
+        namelist = zf.namelist()
+        assert len(namelist) == 2
+        assert any("Alice_Winner" in n for n in namelist)
+        assert any("Bob_Champion" in n for n in namelist)
+
+    # Empty / nonexistent IDs return 400
+    bad_resp = client.post(
+        "/api/certificates/download-selected-zip/",
+        json={"certificate_ids": ["nonexistent-id-1", "nonexistent-id-2"]},
+    )
+    assert bad_resp.status_code == 400
+
+
+def test_s3_presigned_url_rewrite_docker_host() -> None:
+    """Verify S3StorageBackend rewrites docker-internal hostnames for browser access."""
+    from unittest.mock import MagicMock
+
+    from app.config import Settings
+    from app.storage.s3 import S3StorageBackend
+
+    mock_client = MagicMock()
+    mock_client.generate_presigned_url.return_value = (
+        "http://rustfs:9000/certificates/job1/cert1.pdf?AWSAccessKeyId=test"
+    )
+
+    settings = Settings(
+        s3_endpoint_url="http://rustfs:9000",
+        s3_access_key_id="test",
+        s3_secret_access_key="test",
+        s3_bucket_name="certificates",
+    )
+    backend = S3StorageBackend(settings=settings)
+    backend.client = mock_client
+
+    url = backend.get_presigned_url("job1/cert1.pdf")
+    assert url is not None
+    assert "http://localhost:9000" in url
+    assert "rustfs:9000" not in url

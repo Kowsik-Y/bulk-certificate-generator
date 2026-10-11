@@ -188,3 +188,9 @@ class ParseRecipientsResponse(BaseModel):
     recipients: list[RecipientRequest]
     total_count: int
     filename: str
+
+
+class DownloadSelectedZipRequest(BaseModel):
+    """Schema for requesting a zip archive of selected certificate IDs."""
+
+    certificate_ids: list[str] = Field(..., min_length=1, max_length=1000)

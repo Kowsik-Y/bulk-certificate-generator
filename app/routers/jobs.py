@@ -15,6 +15,7 @@ from app.database import get_db
 from app.schemas import (
     CertificateListResponse,
     CertificateResponse,
+    DownloadSelectedZipRequest,
     JobCreateRequest,
     JobCreateResponse,
     JobStatusResponse,
@@ -454,6 +455,33 @@ def download_job_zip(
     safe_title = sanitize_filename(job.title)
     zip_filename = f"{safe_title}_certificates.zip"
 
+    return FileResponse(
+        path=str(zip_path),
+        media_type="application/zip",
+        filename=zip_filename,
+    )
+
+
+@router.post(
+    "/api/certificates/download-selected-zip/",
+    summary="Download selected certificates as a ZIP archive",
+    description="Packages selected certificates by IDs into a single ZIP archive.",
+)
+def download_selected_certificates_zip(
+    payload: DownloadSelectedZipRequest,
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    """Download a ZIP archive containing explicitly selected certificate IDs."""
+    service = JobService(db)
+    try:
+        zip_path = service.create_certificates_zip(payload.certificate_ids)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from None
+
+    zip_filename = f"selected_certificates_{len(payload.certificate_ids)}.zip"
     return FileResponse(
         path=str(zip_path),
         media_type="application/zip",

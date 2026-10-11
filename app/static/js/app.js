@@ -16,6 +16,7 @@ const state = {
   currentSignatureData: null,
   socket: null,
   reconnectAttempts: 0,
+  selectedCertIds: new Set(),
 };
 
 // --- DOM References ---
@@ -32,6 +33,8 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   filesContainer: document.getElementById('filesContainer'),
   btnDownloadZip: document.getElementById('btnDownloadZip'),
+  btnDownloadSelectedZip: document.getElementById('btnDownloadSelectedZip'),
+  btnDownloadSelectedText: document.getElementById('btnDownloadSelectedText'),
   btnRefresh: document.getElementById('btnRefresh'),
   btnNewBatch: document.getElementById('btnNewBatch'),
   btnViewTable: document.getElementById('btnViewTable'),
@@ -185,6 +188,10 @@ async function fetchCertificates(showSpinner = true) {
     state.certificates = data.items;
     state.total = data.total;
 
+    // Retain only selected IDs that still exist in current result
+    const currentIds = new Set(data.items.map(c => c.id));
+    state.selectedCertIds = new Set(Array.from(state.selectedCertIds).filter(id => currentIds.has(id)));
+
     // Enable/disable ZIP button
     if (state.selectedJobId) {
       elements.btnDownloadZip.style.display = 'inline-flex';
@@ -223,15 +230,86 @@ function renderCertificates() {
   }
 }
 
+function updateSelectionUI() {
+  const count = state.selectedCertIds.size;
+  if (elements.btnDownloadSelectedZip) {
+    if (count > 0) {
+      elements.btnDownloadSelectedZip.style.display = 'inline-flex';
+      if (elements.btnDownloadSelectedText) {
+        elements.btnDownloadSelectedText.textContent = `Download Selected (${count}) ZIP`;
+      }
+    } else {
+      elements.btnDownloadSelectedZip.style.display = 'none';
+    }
+  }
+
+  const selectAll = document.getElementById('selectAllCheckbox');
+  if (selectAll) {
+    const readyCerts = state.certificates.filter(c => c.status === 'success');
+    selectAll.checked = readyCerts.length > 0 && readyCerts.every(c => state.selectedCertIds.has(c.id));
+  }
+}
+
+async function downloadSelectedZip() {
+  const ids = Array.from(state.selectedCertIds);
+  if (ids.length === 0) {
+    showToast('Please select at least one ready certificate to download', 'info');
+    return;
+  }
+
+  if (elements.btnDownloadSelectedZip) {
+    elements.btnDownloadSelectedZip.disabled = true;
+  }
+  if (elements.btnDownloadSelectedText) {
+    elements.btnDownloadSelectedText.textContent = 'Generating ZIP...';
+  }
+
+  try {
+    const res = await fetch('/api/certificates/download-selected-zip/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ certificate_ids: ids }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to generate ZIP archive');
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `selected_certificates_${ids.length}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    showToast(`Downloaded ZIP with ${ids.length} certificates`, 'success');
+  } catch (err) {
+    showToast(`Download error: ${err.message}`, 'error');
+  } finally {
+    if (elements.btnDownloadSelectedZip) {
+      elements.btnDownloadSelectedZip.disabled = false;
+    }
+    updateSelectionUI();
+  }
+}
+
 function renderTableView() {
   const rows = state.certificates.map(cert => {
     const statusBadge = getStatusBadge(cert.status);
     const size = cert.file_size_formatted || (cert.status === 'success' ? 'Ready' : '—');
     const isS3 = ['s3', 'rustfs', 'minio'].includes((cert.storage_backend || '').toLowerCase());
     const date = cert.created_at ? new Date(cert.created_at).toLocaleDateString() : '—';
+    const isChecked = state.selectedCertIds.has(cert.id);
+    const isReady = cert.status === 'success';
 
     return `
-      <tr>
+      <tr class="${isChecked ? 'row-selected' : ''}">
+        <td style="text-align:center; width:44px;">
+          <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} ${!isReady ? 'disabled' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
+        </td>
         <td>
           <div class="file-info">
             <div class="file-icon" style="${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
@@ -252,14 +330,14 @@ function renderTableView() {
         <td style="font-size:0.8rem; color:var(--text-muted)">${date}</td>
         <td>
           <div style="display:flex; gap:6px; justify-content:flex-end">
-            ${cert.status === 'success' ? `
+            ${isReady ? `
               <button class="btn btn-secondary btn-icon" title="Preview PDF" onclick="openPreview('${cert.id}', '${escapeAttr(cert.recipient_name)}')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
                 </svg>
               </button>
-              <a href="${cert.presigned_url || cert.download_url}" class="btn btn-secondary btn-icon" title="Download PDF" download>
+              <a href="${cert.download_url}" class="btn btn-secondary btn-icon" title="Download PDF" download>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/>
@@ -284,6 +362,9 @@ function renderTableView() {
       <table class="files-table">
         <thead>
           <tr>
+            <th style="width:44px; text-align:center;">
+              <input type="checkbox" id="selectAllCheckbox" class="cert-checkbox" title="Select all ready certificates">
+            </th>
             <th>Recipient</th>
             <th>Course / Event</th>
             <th>Status</th>
@@ -296,6 +377,7 @@ function renderTableView() {
       </table>
     </div>
   `;
+  updateSelectionUI();
 }
 
 function renderGridView() {
@@ -304,11 +386,16 @@ function renderGridView() {
     const size = cert.file_size_formatted || '—';
     const date = new Date(cert.created_at).toLocaleDateString();
     const isS3 = ['s3', 'rustfs', 'minio'].includes((cert.storage_backend || '').toLowerCase());
+    const isChecked = state.selectedCertIds.has(cert.id);
+    const isReady = cert.status === 'success';
 
     return `
-      <div class="cert-card">
+      <div class="cert-card ${isChecked ? 'card-selected' : ''}">
         <div class="cert-card-header">
-          <div class="file-icon" style="width:42px; height:42px; font-size:14px; ${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" class="cert-checkbox cert-select-checkbox" data-id="${cert.id}" ${isChecked ? 'checked' : ''} ${!isReady ? 'disabled' : ''} aria-label="Select certificate for ${escapeAttr(cert.recipient_name)}">
+            <div class="file-icon" style="width:36px; height:36px; font-size:12px; ${isS3 ? 'background:linear-gradient(135deg, #EA580C, #C2410C); color:#FFF;' : ''}">${isS3 ? 'S3' : 'PDF'}</div>
+          </div>
           ${statusBadge}
         </div>
         <div>
@@ -320,11 +407,11 @@ function renderGridView() {
           <span>${date}</span>
         </div>
         <div class="cert-card-actions">
-          ${cert.status === 'success' ? `
+          ${isReady ? `
             <button class="btn btn-secondary" style="flex:1; padding:8px" onclick="openPreview('${cert.id}', '${escapeAttr(cert.recipient_name)}')">
               Preview
             </button>
-            <a href="${cert.presigned_url || cert.download_url}" class="btn btn-primary" style="flex:1; padding:8px; text-align:center" download>
+            <a href="${cert.download_url}" class="btn btn-primary" style="flex:1; padding:8px; text-align:center" download>
               Download
             </a>
           ` : ''}
@@ -340,6 +427,7 @@ function renderGridView() {
   }).join('');
 
   elements.filesContainer.innerHTML = `<div class="grid-container">${cards}</div>`;
+  updateSelectionUI();
 }
 
 function getStatusBadge(status) {
@@ -731,6 +819,36 @@ function setupEventListeners() {
 
   // Buttons & Modals
   elements.btnDownloadZip.addEventListener('click', downloadCurrentJobZip);
+  if (elements.btnDownloadSelectedZip) {
+    elements.btnDownloadSelectedZip.addEventListener('click', downloadSelectedZip);
+  }
+
+  // Delegation for table/grid selection checkboxes
+  elements.filesContainer.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'selectAllCheckbox') {
+      const checked = e.target.checked;
+      const readyCerts = state.certificates.filter(c => c.status === 'success');
+      if (checked) {
+        readyCerts.forEach(c => state.selectedCertIds.add(c.id));
+      } else {
+        readyCerts.forEach(c => state.selectedCertIds.delete(c.id));
+      }
+      renderCertificates();
+    } else if (e.target && e.target.classList.contains('cert-select-checkbox')) {
+      const id = e.target.dataset.id;
+      if (e.target.checked) {
+        state.selectedCertIds.add(id);
+      } else {
+        state.selectedCertIds.delete(id);
+      }
+      const tr = e.target.closest('tr');
+      if (tr) tr.classList.toggle('row-selected', e.target.checked);
+      const card = e.target.closest('.cert-card');
+      if (card) card.classList.toggle('card-selected', e.target.checked);
+      updateSelectionUI();
+    }
+  });
+
   elements.btnNewBatch.addEventListener('click', openJobModal);
   elements.btnCloseJobModal.addEventListener('click', closeJobModal);
   elements.btnCancelJobModal.addEventListener('click', closeJobModal);

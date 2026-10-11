@@ -394,6 +394,56 @@ class JobService:
 
         return zip_path
 
+    def create_certificates_zip(self, cert_ids: list[str]) -> Path:
+        """Create a zip archive containing selected certificates by ID."""
+        import uuid
+        import zipfile
+
+        certs = [self.repo.get_certificate_by_id(cid) for cid in cert_ids]
+        valid_certs = [c for c in certs if c and c.status == "success" and c.file_path]
+        if not valid_certs:
+            raise ValueError(
+                "No ready certificates available for download in the selected list"
+            )
+
+        zip_dir = Path(self.settings.output_dir) / "zips"
+        zip_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = zip_dir / f"selected_certificates_{uuid.uuid4().hex[:8]}.zip"
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            name_counts: dict[str, int] = {}
+            for cert in valid_certs:
+                if not cert.file_path or not self.storage.exists(cert.file_path):
+                    continue
+
+                clean = (
+                    "".join(
+                        c
+                        for c in cert.recipient_name
+                        if c.isalnum() or c in (" ", "-", "_")
+                    )
+                    .strip()
+                    .replace(" ", "_")
+                )
+                safe_name = clean or "certificate"
+                count = name_counts.get(safe_name, 0)
+                name_counts[safe_name] = count + 1
+                arc_name = (
+                    f"{safe_name}.pdf" if count == 0 else f"{safe_name}_{count}.pdf"
+                )
+
+                try:
+                    pdf_bytes = self.storage.get_bytes(cert.file_path)
+                    zf.writestr(arc_name, pdf_bytes)
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to read %s for zip packaging: %s",
+                        cert.file_path,
+                        exc,
+                    )
+
+        return zip_path
+
     def get_system_stats(self) -> SystemStatsResponse:
         """Aggregate total job/certificate metrics and calculate storage usage."""
         db_stats = self.repo.get_system_stats()

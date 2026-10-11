@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     output_dir: str = "./output"
     app_title: str = "Bulk Certificate Generator API"
     app_version: str = "0.1.0"
+    max_recipients_per_batch: int = 1000
 
     model_config = SettingsConfigDict(
         env_file=".env",

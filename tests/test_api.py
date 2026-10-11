@@ -157,10 +157,9 @@ def test_download_failed_certificate_returns_400(
 
 
 def test_download_missing_file_from_storage_returns_404(
-    client: TestClient, db_session
+    client: TestClient, db_session, temp_output_dir
 ) -> None:
     """GET /api/certificates/{id}/download/ returns 404 if file is deleted."""
-
     from app.models import Certificate, Job
 
     job = Job(
@@ -176,7 +175,7 @@ def test_download_missing_file_from_storage_returns_404(
         job_id=job.id,
         recipient_name="Missing File User",
         status="success",
-        file_path="/tmp/non_existent_path_xyz_123.pdf",
+        file_path=str(temp_output_dir / "non_existent_path_xyz_123.pdf"),
     )
     db_session.add(cert)
     db_session.commit()
@@ -184,6 +183,33 @@ def test_download_missing_file_from_storage_returns_404(
     resp = client.get(f"/api/certificates/{cert.id}/download/")
     assert resp.status_code == 404
     assert "missing from storage" in resp.json()["detail"].lower()
+
+
+def test_download_path_traversal_returns_403(client: TestClient, db_session) -> None:
+    """GET /api/certificates/{id}/download/ returns 403 if path is outside storage."""
+    from app.models import Certificate, Job
+
+    job = Job(
+        title="Test Job",
+        organization="Test Org",
+        date_of_issue="2026-10-15",
+        total_recipients=1,
+    )
+    db_session.add(job)
+    db_session.flush()
+
+    cert = Certificate(
+        job_id=job.id,
+        recipient_name="Malicious User",
+        status="success",
+        file_path="/etc/passwd",
+    )
+    db_session.add(cert)
+    db_session.commit()
+
+    resp = client.get(f"/api/certificates/{cert.id}/download/")
+    assert resp.status_code == 403
+    assert "outside authorized storage" in resp.json()["detail"].lower()
 
 
 def test_database_init_and_get_db() -> None:

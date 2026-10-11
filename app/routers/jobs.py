@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.database import get_db
 from app.schemas import (
     CertificateResponse,
@@ -132,7 +133,19 @@ def download_certificate(
             detail=f"Certificate not available: {error_detail}",
         )
 
-    file_path = Path(cert.file_path)
+    settings = get_settings()
+    file_path = Path(cert.file_path).resolve()
+    base_storage = Path(settings.output_dir).resolve()
+
+    # Path traversal security protection
+    try:
+        file_path.relative_to(base_storage)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: file path is outside authorized storage directory",
+        ) from None
+
     if not file_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

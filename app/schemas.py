@@ -25,6 +25,8 @@ class RecipientRequest(BaseModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("Name cannot be blank or whitespace only")
+        if any(c in stripped for c in "\r\n\0"):
+            raise ValueError("Name cannot contain newline or control characters")
         return stripped
 
     @field_validator("email")
@@ -57,7 +59,8 @@ class JobCreateRequest(BaseModel):
     recipients: list[RecipientRequest] = Field(
         ...,
         min_length=1,
-        description="List of recipients (at least one recipient required)",
+        max_length=1000,
+        description="List of recipients (1 to 1000 recipients per batch)",
     )
 
     @field_validator("title")
@@ -66,6 +69,8 @@ class JobCreateRequest(BaseModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("Title cannot be blank or whitespace only")
+        if any(c in stripped for c in "\r\n\0"):
+            raise ValueError("Title cannot contain newline or control characters")
         return stripped
 
     @field_validator("organization")
@@ -74,6 +79,10 @@ class JobCreateRequest(BaseModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("Organization cannot be blank or whitespace only")
+        if any(c in stripped for c in "\r\n\0"):
+            raise ValueError(
+                "Organization cannot contain newline or control characters"
+            )
         return stripped
 
     @field_validator("date_of_issue")

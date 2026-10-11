@@ -6,13 +6,13 @@ A high-performance, asynchronous backend API built with **FastAPI**, **Celery**,
 
 ## Features
 
-- ⚡ **Asynchronous Job Processing**: Submit bulk certificate requests and receive immediate acknowledgement (`202 Accepted`). Certificate generation executes in background workers powered by Celery and Redis.
-- 🛡️ **Per-Certificate Error Isolation**: A rendering error or malformed data in an individual certificate does **not** fail the batch. Successful certificates are persisted and made downloadable, while failures are captured with descriptive error messages.
-- 🎨 **Vector PDF Generation**: Uses ReportLab canvas drawing to generate crisp, print-ready landscape certificates (ivory background, double gold borders, corner ornaments, official seals, and custom typography) with zero external image dependencies.
-- 📐 **Strict Data Validation**: Validates all payload structures at the API boundary using Pydantic v2 (name formatting, non-blank checks, regex for emails and ISO dates).
-- 🔄 **Fault-Tolerant & Durable**: Celery tasks feature `acks_late=True`, exponential backoff retry policies, and `worker_prefetch_multiplier=1` for fair queue balancing.
-- 📦 **Layered Architecture**: Clean separation between Routers, Service Layer, Repository Layer, and PDF Generator.
-- 🧪 **100% Test Coverage**: Comprehensive test suite covering API contracts, validation edge cases, ReportLab PDF rendering, service layer logic, and failure resilience.
+- **Asynchronous Job Processing**: Submit bulk certificate requests and receive immediate acknowledgement (`202 Accepted`). Certificate generation executes in background workers powered by Celery and Redis.
+- **Per-Certificate Error Isolation**: A rendering error or malformed data in an individual certificate does **not** fail the batch. Successful certificates are persisted and made downloadable, while failures are captured with descriptive error messages.
+- **Vector PDF Generation**: Uses ReportLab canvas drawing to generate crisp, print-ready landscape certificates (ivory background, double gold borders, corner ornaments, official seals, and custom typography) with zero external image dependencies.
+- **Strict Data Validation**: Validates all payload structures at the API boundary using Pydantic v2 (name formatting, non-blank checks, regex for emails and ISO dates).
+- **Fault-Tolerant & Durable**: Celery tasks feature `acks_late=True`, exponential backoff retry policies, and `worker_prefetch_multiplier=1` for fair queue balancing.
+- **Layered Architecture**: Clean separation between Routers, Service Layer, Repository Layer, and PDF Generator.
+- **100% Test Coverage**: Comprehensive test suite covering API contracts, validation edge cases, ReportLab PDF rendering, service layer logic, and failure resilience.
 
 ---
 

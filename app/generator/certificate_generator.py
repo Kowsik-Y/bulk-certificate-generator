@@ -96,8 +96,15 @@ def generate_certificate(
     draw_corner_ornament(c, width - 34, height - 34)
 
     # --- Header Section: Organization Name ---
+    max_org_width = width - 160
+    org_size = 15
+    while (
+        c.stringWidth(organization.upper(), "Helvetica-Bold", org_size) > max_org_width
+        and org_size > 9
+    ):
+        org_size -= 1
     c.setFillColor(HexColor("#1A1A2E"))  # Deep midnight navy
-    c.setFont("Helvetica-Bold", 15)
+    c.setFont("Helvetica-Bold", org_size)
     c.drawCentredString(width / 2, height - 90, organization.upper())
 
     # --- Main Certificate Title ---
@@ -121,16 +128,23 @@ def generate_certificate(
         width / 2, height - 232, "This certificate is proudly presented to"
     )
 
-    # --- Recipient Name ---
-    c.setFont("Helvetica-Bold", 28)
+    # --- Recipient Name (with dynamic font scaling for long names) ---
+    max_name_width = width - 140
+    name_size = 28
+    while (
+        c.stringWidth(recipient_name, "Helvetica-Bold", name_size) > max_name_width
+        and name_size > 14
+    ):
+        name_size -= 2
+    c.setFont("Helvetica-Bold", name_size)
     c.setFillColor(HexColor("#0F172A"))  # Slate black
     c.drawCentredString(width / 2, height - 280, recipient_name)
 
     # Dynamic underline beneath recipient name
-    name_width = c.stringWidth(recipient_name, "Helvetica-Bold", 28)
+    name_width = c.stringWidth(recipient_name, "Helvetica-Bold", name_size)
     line_padding = 24
-    line_x1 = (width - name_width) / 2 - line_padding
-    line_x2 = (width + name_width) / 2 + line_padding
+    line_x1 = max(45.0, (width - name_width) / 2 - line_padding)
+    line_x2 = min(width - 45.0, (width + name_width) / 2 + line_padding)
     c.setStrokeColor(HexColor("#B8860B"))
     c.setLineWidth(1.8)
     c.line(line_x1, height - 292, line_x2, height - 292)
@@ -144,7 +158,14 @@ def generate_certificate(
         "for successfully completing and fulfilling all requirements of",
     )
 
-    c.setFont("Helvetica-Bold", 19)
+    max_title_width = width - 140
+    title_size = 19
+    while (
+        c.stringWidth(title, "Helvetica-Bold", title_size) > max_title_width
+        and title_size > 11
+    ):
+        title_size -= 1
+    c.setFont("Helvetica-Bold", title_size)
     c.setFillColor(HexColor("#1A1A2E"))
     c.drawCentredString(width / 2, height - 364, title)
 

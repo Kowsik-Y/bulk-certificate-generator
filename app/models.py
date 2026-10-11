@@ -57,11 +57,16 @@ class Certificate(Base):
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid4())
     )
-    job_id: Mapped[str] = mapped_column(String, ForeignKey("jobs.id"), nullable=False)
+    job_id: Mapped[str] = mapped_column(
+        String, ForeignKey("jobs.id"), nullable=False, index=True
+    )
 
     recipient_name: Mapped[str] = mapped_column(String(200), nullable=False)
     recipient_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", index=True
+    )
+
     # Status lifecycle: pending -> success / failed
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(String, nullable=True)

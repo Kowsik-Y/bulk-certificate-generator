@@ -91,3 +91,22 @@ def test_generate_with_empty_date_raises_error(tmp_path: Path) -> None:
             date_of_issue="",
             output_path=str(output_file),
         )
+
+
+def test_generate_with_long_name_and_title(tmp_path: Path) -> None:
+    """Long recipient name, title, and organization scale font without error."""
+    output_file = tmp_path / "cert_long.pdf"
+    result = generate_certificate(
+        recipient_name=("Dr. Alexander Montgomery Bartholomew Fitzwilliam III"),
+        title=(
+            "Comprehensive Advanced Distributed Microservices & Systems Architecture"
+        ),
+        organization=(
+            "International Global Association of High Performance Computing Engineers"
+        ),
+        date_of_issue="2026-10-15",
+        output_path=str(output_file),
+    )
+
+    assert Path(result).is_file()
+    assert Path(result).stat().st_size > 1000

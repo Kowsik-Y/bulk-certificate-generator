@@ -143,3 +143,51 @@ def test_whitespace_email_treated_as_none(client: TestClient) -> None:
     }
     resp = client.post("/api/jobs/", json=payload)
     assert resp.status_code == 202
+
+
+def test_newline_in_recipient_name_rejected(client: TestClient) -> None:
+    """Recipient name containing newline or carriage return returns 422."""
+    payload = {
+        "title": "Python Bootcamp",
+        "organization": "Tech Org",
+        "date_of_issue": "2026-10-15",
+        "recipients": [{"name": "Alice\nSmith"}],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 422
+
+
+def test_newline_in_title_rejected(client: TestClient) -> None:
+    """Title containing newline or carriage return returns 422."""
+    payload = {
+        "title": "Python\nBootcamp",
+        "organization": "Tech Org",
+        "date_of_issue": "2026-10-15",
+        "recipients": [{"name": "Alice Smith"}],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 422
+
+
+def test_newline_in_organization_rejected(client: TestClient) -> None:
+    """Organization containing newline or carriage return returns 422."""
+    payload = {
+        "title": "Python Bootcamp",
+        "organization": "Tech\nOrg",
+        "date_of_issue": "2026-10-15",
+        "recipients": [{"name": "Alice Smith"}],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 422
+
+
+def test_batch_exceeding_max_recipients_rejected(client: TestClient) -> None:
+    """Batch with >1000 recipients returns 422."""
+    payload = {
+        "title": "Python Bootcamp",
+        "organization": "Tech Org",
+        "date_of_issue": "2026-10-15",
+        "recipients": [{"name": f"User {i}"} for i in range(1001)],
+    }
+    resp = client.post("/api/jobs/", json=payload)
+    assert resp.status_code == 422

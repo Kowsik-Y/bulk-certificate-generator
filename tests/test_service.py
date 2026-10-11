@@ -90,3 +90,28 @@ def test_repository_custom_ids(db_session: Session) -> None:
         cert_id="custom-cert-id-456",
     )
     assert cert.id == "custom-cert-id-456"
+
+
+def test_process_job_idempotent_skips_already_generated(
+    db_session: Session,
+    temp_output_dir: Path,
+) -> None:
+    """Repeated processing skips re-generating already created certificates."""
+    service = JobService(db_session)
+    req = JobCreateRequest(
+        title="Distributed Systems",
+        organization="Tech Org",
+        date_of_issue="2026-10-15",
+        recipients=[RecipientRequest(name="Grace Hopper")],
+    )
+    job = service.create_job(req)
+    processed_1 = service.process_job(job.id)
+    assert processed_1.successful_count == 1
+    cert = processed_1.certificates[0]
+    first_mtime = Path(cert.file_path).stat().st_mtime_ns
+
+    # Re-process job - should skip re-generation and preserve existing file
+    processed_2 = service.process_job(job.id)
+    assert processed_2.successful_count == 1
+    second_mtime = Path(cert.file_path).stat().st_mtime_ns
+    assert first_mtime == second_mtime

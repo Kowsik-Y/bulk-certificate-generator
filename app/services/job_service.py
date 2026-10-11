@@ -89,6 +89,16 @@ class JobService:
 
         for cert in job.certificates:
             output_file = output_dir / f"{cert.id}.pdf"
+
+            # Idempotency check: skip regeneration if certificate was already created
+            if (
+                cert.status == "success"
+                and cert.file_path
+                and Path(cert.file_path).is_file()
+            ):
+                success_count += 1
+                continue
+
             try:
                 generate_certificate(
                     recipient_name=cert.recipient_name,

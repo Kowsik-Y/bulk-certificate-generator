@@ -72,6 +72,7 @@ def temp_output_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     monkeypatch.setattr("app.config.get_settings", mock_get_settings)
     monkeypatch.setattr("app.services.job_service.get_settings", mock_get_settings)
+    monkeypatch.setattr("app.routers.jobs.get_settings", mock_get_settings)
     return out_dir
 
 

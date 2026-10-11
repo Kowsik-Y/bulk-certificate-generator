@@ -86,6 +86,12 @@ function Start-LocalStack {
     & $venvPip install -r requirements.txt --quiet
     Write-Success "Dependencies installed."
 
+    # Configure Git Hooks
+    if ((Test-Path ".git") -and (Test-Path ".husky")) {
+        git config core.hooksPath .husky
+        Write-Success "Git pre-commit and pre-push hooks activated."
+    }
+
     if (-not (Test-Path "output")) {
         New-Item -ItemType Directory -Path "output" | Out-Null
     }

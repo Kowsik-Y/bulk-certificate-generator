@@ -324,7 +324,7 @@ python scripts/check_limits.py
 The project includes automated **Husky** Git hooks to prevent committing or pushing bad code or oversized files:
 
 - **`pre-commit` Hook**:
-  - Runs [scripts/check_limits.py](file:///Users/kowsik/Documents/Bulk%20Certificate%20Generator/scripts/check_limits.py) (blocks staged files $> 2$ MB, forbidden extensions like `.db`, `.pdf`, `.env`, and secret leaks).
+  - Runs [`scripts/check_limits.py`](scripts/check_limits.py) (blocks staged files $> 2$ MB, forbidden extensions like `.db`, `.pdf`, `.env`, and secret leaks).
   - Runs `ruff check` and `ruff format --check`.
   - Runs `mypy app` for static type safety.
 - **`pre-push` Hook**:

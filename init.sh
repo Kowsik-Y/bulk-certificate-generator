@@ -68,6 +68,12 @@ run_local() {
     pip install -r requirements.txt --quiet
     log_success "Dependencies installed."
 
+    # Configure Git Hooks
+    if [ -d ".git" ] && [ -d ".husky" ]; then
+        git config core.hooksPath .husky
+        log_success "Git pre-commit and pre-push hooks activated."
+    fi
+
     # Start Redis & RustFS infrastructure
     log_info "Checking infrastructure services (Redis & RustFS)..."
     if command -v docker &> /dev/null; then
